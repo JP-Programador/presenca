@@ -128,7 +128,7 @@ export function CoordenadorDashboard() {
         </div>
 
         <Card className="mb-6">
-          <CardHeader className="flex items-center justify-between">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa das presenças</h2>
               <p className="text-xs text-ink/50 dark:text-white/50">Registros com localização capturada.</p>
@@ -240,7 +240,7 @@ export function CoordenadorDashboard() {
         </Card>
 
         <Card className="mb-6">
-          <CardHeader className="flex items-center justify-between">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-ink dark:text-white">Ranking de líderes</h2>
               <p className="text-xs text-ink/50 dark:text-white/50">Ordenado por % de decisões dentro do SLA de 2h.</p>

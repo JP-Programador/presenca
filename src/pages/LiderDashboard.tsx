@@ -89,11 +89,11 @@ export function LiderDashboard() {
       />
 
       <main className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
-        <div className="mb-5 flex gap-2 rounded-md bg-white p-1 shadow-sm dark:bg-[#242424]">
+        <div className="mb-5 grid grid-cols-2 gap-2 rounded-md bg-white p-1 shadow-sm dark:bg-[#242424] sm:flex">
           <button
             onClick={() => setAba("presenca")}
             className={[
-              "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+              "rounded-md px-3 py-2 text-xs font-semibold transition-colors sm:flex-1 sm:text-sm",
               aba === "presenca" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface dark:hover:bg-white/5",
             ].join(" ")}
           >
@@ -102,7 +102,7 @@ export function LiderDashboard() {
           <button
             onClick={() => setAba("justificativas")}
             className={[
-              "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+              "rounded-md px-3 py-2 text-xs font-semibold transition-colors sm:flex-1 sm:text-sm",
               aba === "justificativas" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface dark:hover:bg-white/5",
             ].join(" ")}
           >
@@ -111,7 +111,7 @@ export function LiderDashboard() {
           <button
             onClick={() => setAba("status_dia")}
             className={[
-              "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+              "rounded-md px-3 py-2 text-xs font-semibold transition-colors sm:flex-1 sm:text-sm",
               aba === "status_dia" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface dark:hover:bg-white/5",
             ].join(" ")}
           >
@@ -120,7 +120,7 @@ export function LiderDashboard() {
           <button
             onClick={() => setAba("geral")}
             className={[
-              "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+              "rounded-md px-3 py-2 text-xs font-semibold transition-colors sm:flex-1 sm:text-sm",
               aba === "geral" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface dark:hover:bg-white/5",
             ].join(" ")}
           >

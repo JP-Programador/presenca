@@ -171,7 +171,7 @@ export function PendenciasPainel({ itens, renderAcoes }: PendenciasPainelProps) 
                       {item.status === "OUTROS" && item.motivo_outros ? ` · ${item.motivo_outros}` : ""}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                     <span className={["rounded-full px-2.5 py-1 text-xs font-semibold", corBadge].join(" ")}>
                       {STATUS_DIA_LABEL[item.status]}
                     </span>

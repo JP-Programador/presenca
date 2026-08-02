@@ -81,7 +81,7 @@ export function UsuariosGestao() {
         )}
 
         <Card className="mb-6">
-          <CardHeader className="flex items-center justify-between">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-ink dark:text-white">Novo usuário</h2>
             <Button variant="ghost" size="md" onClick={() => setMostrarFormulario((v) => !v)}>
               {mostrarFormulario ? "Fechar" : "Novo usuário"}
@@ -100,7 +100,7 @@ export function UsuariosGestao() {
         </Card>
 
         <Card>
-          <CardHeader className="flex items-center justify-between">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-ink dark:text-white">Hierarquia de acesso</h2>
             <ExportButtons
               dados={dadosExportacao}

@@ -68,7 +68,7 @@ export function ColaboradoresGestao() {
         )}
 
         <Card className="mb-6">
-          <CardHeader className="flex items-center justify-between">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-ink dark:text-white">Novo colaborador</h2>
             <Button variant="ghost" size="md" onClick={() => setMostrarFormulario((v) => !v)}>
               {mostrarFormulario ? "Fechar" : "Cadastrar"}
