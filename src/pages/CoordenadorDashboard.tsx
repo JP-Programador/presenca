@@ -1,0 +1,312 @@
+import { useEffect, useMemo, useState } from "react";
+import { BrandHeader } from "@/components/layout/BrandHeader";
+import { NavPaineis } from "@/components/layout/NavPaineis";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { MetricCard } from "@/components/ui/MetricCard";
+import { ExportButtons } from "@/components/ui/ExportButtons";
+import { PresencaMap } from "@/components/presenca/PresencaMap";
+import { PresenceMap } from "@/components/presenca/PresenceMap";
+import { RankingLideres } from "@/components/presenca/RankingLideres";
+import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
+import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
+import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
+import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
+import { useAuth } from "@/providers/AuthProvider";
+import { hojeISO } from "@/lib/calendario";
+import { listarRankingLideres, listarRegistrosParaMapa } from "@/services/coordenacaoService";
+import * as statusDiaService from "@/services/statusDiaService";
+import { listarMapaOperacional } from "@/services/mapaOperacionalService";
+import { listarSlaStatusDia, mediaDiaria, mediaMensal, ranquearPorLider } from "@/services/slaService";
+import type { RegistroPresenca, SlaLider } from "@/types/domain";
+import type { MotivoOutros, PontoMapaOperacional, SlaStatusDia, StatusDiaRegistro } from "@/types/status";
+
+export function CoordenadorDashboard() {
+  // Papel (admin/coordenador) já validado por <RequireRole> na definição das rotas.
+  const { usuario, sair } = useAuth();
+  const [registros, setRegistros] = useState<RegistroPresenca[]>([]);
+  const [ranking, setRanking] = useState<SlaLider[]>([]);
+  const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);
+  const [pontosMapa, setPontosMapa] = useState<PontoMapaOperacional[]>([]);
+  const [decisoesSla, setDecisoesSla] = useState<SlaStatusDia[]>([]);
+  const [carregandoDados, setCarregandoDados] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [janela, setJanela] = useState<24 | 72 | 168>(24);
+
+  async function carregar() {
+    setCarregandoDados(true);
+    setErro(null);
+    try {
+      const trintaDiasAtras = new Date();
+      trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+      const [regs, rank, statusDia, pontos, sla] = await Promise.all([
+        listarRegistrosParaMapa(janela),
+        listarRankingLideres(),
+        statusDiaService.listarStatusDia(hojeISO()),
+        listarMapaOperacional(hojeISO()),
+        listarSlaStatusDia(trintaDiasAtras.toISOString().slice(0, 10)),
+      ]);
+      setRegistros(regs);
+      setRanking(rank);
+      setStatusDoDia(statusDia);
+      setPontosMapa(pontos);
+      setDecisoesSla(sla);
+    } catch {
+      setErro("Não foi possível carregar os dados do dashboard.");
+    } finally {
+      setCarregandoDados(false);
+    }
+  }
+
+  async function aplicarEventoStatusDia(
+    row: StatusDiaRegistro,
+    executar: () => Promise<StatusDiaRegistro>
+  ) {
+    const atualizado = await executar();
+    setStatusDoDia((prev) => prev.map((item) => (item.id === row.id ? atualizado : item)));
+  }
+
+  useEffect(() => {
+    if (usuario) carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, janela]);
+
+  const metricas = useMemo(() => {
+    const total = registros.length;
+    const atrasados = registros.filter((r) => r.status === "atrasado").length;
+    const ausentes = registros.filter((r) => r.status === "ausente").length;
+    const slaMedio =
+      ranking.length > 0
+        ? Math.round(
+            (ranking.reduce((soma, l) => soma + (l.pct_dentro_sla ?? 0), 0) / ranking.length) * 10
+          ) / 10
+        : null;
+    return { total, atrasados, ausentes, slaMedio };
+  }, [registros, ranking]);
+
+  const rankingSla = useMemo(() => ranquearPorLider(decisoesSla), [decisoesSla]);
+  const mediaGeralMin = useMemo(() => {
+    if (decisoesSla.length === 0) return null;
+    return Math.round((decisoesSla.reduce((soma, d) => soma + d.minutos, 0) / decisoesSla.length) * 10) / 10;
+  }, [decisoesSla]);
+  const mediaMesAtualMin = useMemo(() => {
+    const mesAtual = hojeISO().slice(0, 7);
+    const doMes = mediaMensal(decisoesSla).find((m) => m.mes === mesAtual);
+    return doMes?.media_min ?? null;
+  }, [decisoesSla]);
+  const mediasDiariasRecentes = useMemo(() => mediaDiaria(decisoesSla).slice(0, 7), [decisoesSla]);
+
+  if (!usuario) return null; // narrowing de tipo; na prática nunca alcançado (ver RequireRole)
+
+  const ehAuditor = usuario.perfil === "auditor";
+
+  return (
+    <div className="min-h-screen bg-surface">
+      <BrandHeader
+        title="Painel de coordenação"
+        subtitle="Visão consolidada de todas as filiais"
+        right={<NavPaineis perfil={usuario.perfil} atual="coordenador" onSair={sair} />}
+      />
+
+      <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
+        {erro && (
+          <div className="mb-4">
+            <Alert variant="danger">{erro}</Alert>
+          </div>
+        )}
+
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MetricCard label={`Registros (${janela}h)`} valor={String(metricas.total)} />
+          <MetricCard label="Atrasados" valor={String(metricas.atrasados)} destaque="warning" />
+          <MetricCard label="Ausentes" valor={String(metricas.ausentes)} destaque="danger" />
+          <MetricCard
+            label="SLA médio dos líderes"
+            valor={metricas.slaMedio != null ? `${metricas.slaMedio}%` : "—"}
+            destaque="primary"
+          />
+        </div>
+
+        <Card className="mb-6">
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-ink">Mapa das presenças</h2>
+              <p className="text-xs text-ink/50">Registros com localização capturada.</p>
+            </div>
+            <div className="flex gap-1 rounded-md bg-surface p-1">
+              {[
+                { valor: 24, label: "24h" },
+                { valor: 72, label: "3 dias" },
+                { valor: 168, label: "7 dias" },
+              ].map((opcao) => (
+                <button
+                  key={opcao.valor}
+                  onClick={() => setJanela(opcao.valor as 24 | 72 | 168)}
+                  className={[
+                    "rounded px-2.5 py-1 text-xs font-semibold",
+                    janela === opcao.valor ? "bg-white text-primary shadow-sm" : "text-ink/50",
+                  ].join(" ")}
+                >
+                  {opcao.label}
+                </button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardBody>
+            {carregandoDados ? <MapaCarregando /> : <PresencaMap registros={registros} />}
+          </CardBody>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-ink">Exportações</h2>
+            <p className="text-xs text-ink/50">Relatórios de presença, pendências, rejeições e auditoria.</p>
+          </CardHeader>
+          <CardBody>
+            <RelatoriosExport />
+          </CardBody>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-ink">Mapa operacional (hoje)</h2>
+            <p className="text-xs text-ink/50">
+              Status do dia de cada colaborador, com localização quando disponível.
+            </p>
+          </CardHeader>
+          <CardBody>
+            {carregandoDados ? <MapaCarregando /> : <PresenceMap pontos={pontosMapa} />}
+          </CardBody>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-ink">Pendências e cobrança</h2>
+            <p className="text-xs text-ink/50">Status do dia de todos os colaboradores, todas as filiais.</p>
+          </CardHeader>
+          <CardBody>
+            {carregandoDados ? (
+              <div className="flex justify-center py-8">
+                <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
+              <PendenciasPainel
+                itens={statusDoDia}
+                renderAcoes={
+                  ehAuditor
+                    ? undefined
+                    : (row) => (
+                        <StatusActionMenu
+                          nome={row.colaborador_nome ?? "Colaborador"}
+                          statusAtual={row.status}
+                          onAprovar={() =>
+                            aplicarEventoStatusDia(row, () =>
+                              statusDiaService.aplicarEvento(row, { tipo: "APROVAR" })
+                            )
+                          }
+                          onRejeitar={() =>
+                            aplicarEventoStatusDia(row, () =>
+                              statusDiaService.aplicarEvento(row, { tipo: "REJEITAR" })
+                            )
+                          }
+                          onMarcarManual={(status, opts) =>
+                            aplicarEventoStatusDia(row, () =>
+                              statusDiaService.aplicarEvento(row, {
+                                tipo: "MARCAR_MANUAL",
+                                status,
+                                motivoOutros: opts?.motivoOutros as MotivoOutros | undefined,
+                                observacao: opts?.observacao,
+                              })
+                            )
+                          }
+                        />
+                      )
+                }
+              />
+            )}
+          </CardBody>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-ink">Ranking de líderes</h2>
+              <p className="text-xs text-ink/50">Ordenado por % de decisões dentro do SLA de 2h.</p>
+            </div>
+            <ExportButtons
+              dados={ranking}
+              nomeBase="ranking-lideres"
+              colunas={[
+                { chave: "gestor_nome", titulo: "Líder" },
+                { chave: "filial_home_nome", titulo: "Filial" },
+                { chave: "total_decisoes", titulo: "Decisões" },
+                { chave: "total_aprovadas", titulo: "Aprovadas" },
+                { chave: "total_rejeitadas", titulo: "Rejeitadas" },
+                { chave: "tempo_medio_min", titulo: "Tempo médio (min)" },
+                { chave: "pct_dentro_sla", titulo: "% dentro do SLA" },
+                { chave: "pendencias_atuais", titulo: "Pendências atuais" },
+              ]}
+            />
+          </CardHeader>
+          <CardBody>
+            {carregandoDados ? (
+              <div className="flex justify-center py-8">
+                <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
+              <RankingLideres dados={ranking} />
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-ink">SLA de aprovação — status do dia</h2>
+            <p className="text-xs text-ink/50">
+              Tempo entre o envio da presença (PENDENTE) e a decisão do líder. Verde ≤15min, amarelo 15-30min,
+              vermelho &gt;30min.
+            </p>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-5">
+            {carregandoDados ? (
+              <div className="flex justify-center py-8">
+                <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
+              <>
+                <RankingSlaStatusDia
+                  ranking={rankingSla}
+                  mediaGeralMin={mediaGeralMin}
+                  mediaMesAtualMin={mediaMesAtualMin}
+                />
+                {mediasDiariasRecentes.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold text-ink/60">Últimos dias</p>
+                    <div className="flex flex-wrap gap-2">
+                      {mediasDiariasRecentes.map((m) => (
+                        <div key={m.data} className="rounded-md border border-ink/10 px-3 py-1.5 text-xs">
+                          <span className="text-ink/50">
+                            {new Date(m.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                          </span>{" "}
+                          <span className="font-semibold text-ink">{m.media_min} min</span>{" "}
+                          <span className="text-ink/40">({m.total})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardBody>
+        </Card>
+      </main>
+    </div>
+  );
+}
+
+function MapaCarregando() {
+  return (
+    <div className="flex h-[420px] items-center justify-center rounded-lg border border-ink/10 bg-surface">
+      <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    </div>
+  );
+}

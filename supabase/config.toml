@@ -1,0 +1,13 @@
+project_id = "tlp-presenca-operacional"
+
+[functions.delete-old-photos]
+verify_jwt = false
+
+[functions.checkin-publico]
+verify_jwt = false
+
+[functions.marcacao-publica]
+verify_jwt = false
+
+[functions.admin-criar-usuario]
+verify_jwt = true
