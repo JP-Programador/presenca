@@ -1,13 +1,14 @@
 import { supabase } from "@/services/supabaseClient";
 import type { Colaborador } from "@/types/domain";
 
-const SELECT_COLUNAS = "id, filial_id, lider_id, matricula, nome, cargo, tipo_contrato, ativo, filiais(nome), perfis:lider_id(nome)";
+const SELECT_COLUNAS =
+  "id, filial_id, lider_id, matricula, nome, cargo, tipo_contrato, ativo, filiais(nome), lider:perfis!lider_id(nome)";
 
 function mapearLinha(row: any): Colaborador {
   return {
     ...row,
     filial_nome: row.filiais?.nome,
-    lider_nome: row.perfis?.nome,
+    lider_nome: row.lider?.nome,
   };
 }
 
