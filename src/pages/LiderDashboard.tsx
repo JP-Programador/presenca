@@ -7,6 +7,7 @@ import { PendenteCard } from "@/components/presenca/PendenteCard";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { MiniMapCard } from "@/components/presenca/MiniMapCard";
+import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
 import { useAuth } from "@/providers/AuthProvider";
 import { hojeISO } from "@/lib/calendario";
 import {
@@ -29,7 +30,7 @@ const TIPO_LABEL: Record<string, string> = {
   saida: "Saída",
 };
 
-type Aba = "presenca" | "justificativas" | "status_dia";
+type Aba = "presenca" | "justificativas" | "status_dia" | "geral";
 
 export function LiderDashboard() {
   // Sessão já validada por <RequireAuth> na definição das rotas.
@@ -80,7 +81,7 @@ export function LiderDashboard() {
   const ehAuditor = usuario.perfil === "auditor";
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
       <BrandHeader
         title={`Olá, ${usuario?.nome.split(" ")[0]}`}
         subtitle="Aprovações pendentes da sua filial"
@@ -88,12 +89,12 @@ export function LiderDashboard() {
       />
 
       <main className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
-        <div className="mb-5 flex gap-2 rounded-md bg-white p-1 shadow-sm">
+        <div className="mb-5 flex gap-2 rounded-md bg-white p-1 shadow-sm dark:bg-[#242424]">
           <button
             onClick={() => setAba("presenca")}
             className={[
               "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
-              aba === "presenca" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface",
+              aba === "presenca" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface dark:hover:bg-white/5",
             ].join(" ")}
           >
             Presença ({registros.length})
@@ -102,7 +103,7 @@ export function LiderDashboard() {
             onClick={() => setAba("justificativas")}
             className={[
               "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
-              aba === "justificativas" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface",
+              aba === "justificativas" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface dark:hover:bg-white/5",
             ].join(" ")}
           >
             Justificativas ({justificativas.length})
@@ -111,10 +112,19 @@ export function LiderDashboard() {
             onClick={() => setAba("status_dia")}
             className={[
               "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
-              aba === "status_dia" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface",
+              aba === "status_dia" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface dark:hover:bg-white/5",
             ].join(" ")}
           >
             Status do dia ({statusDoDia.length})
+          </button>
+          <button
+            onClick={() => setAba("geral")}
+            className={[
+              "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+              aba === "geral" ? "bg-primary text-white" : "text-ink/60 hover:bg-surface dark:hover:bg-white/5",
+            ].join(" ")}
+          >
+            Geral
           </button>
         </div>
 
@@ -225,6 +235,8 @@ export function LiderDashboard() {
                 }
               />
             )}
+
+            {aba === "geral" && <TabelaGeralStatus />}
           </div>
         )}
       </main>

@@ -23,6 +23,20 @@ const FILTROS: { chave: Filtro; label: string }[] = [
   { chave: "outros", label: "Outros" },
 ];
 
+/** Classes do badge de status quando o filtro correspondente está ativo (só então ganha cor — o resto fica neutro). */
+const CORES_QUANDO_ATIVO: Record<Filtro, string> = {
+  todos: "bg-surface text-ink/70 dark:bg-white/10 dark:text-white/70",
+  nao_lancaram: "bg-[#FBE7E7] text-danger",
+  aguardando_aprovacao: "bg-[#FFF3DB] text-[#8A6200]",
+  presentes: "bg-[#E7F3E8] text-[#2E7D32]",
+  faltas: "bg-[#FBE7E7] text-danger",
+  atestados: "bg-[#E3EEFA] text-[#1E6FA8]",
+  folgas: "bg-surface text-ink/70 dark:bg-white/10 dark:text-white/70",
+  outros: "bg-surface text-ink/70 dark:bg-white/10 dark:text-white/70",
+};
+
+const NEUTRO = "bg-surface text-ink/70 dark:bg-white/10 dark:text-white/70";
+
 function pertenceAoFiltro(status: StatusDia, filtro: Filtro): boolean {
   switch (filtro) {
     case "todos":
@@ -60,8 +74,10 @@ interface PendenciasPainelProps {
 
 /**
  * Painel de pendências e cobrança (Módulo 8) — reutilizado nos dashboards
- * de líder, coordenação e auditoria. Agrupa por status, com contador,
- * filtro rápido e busca por matrícula/nome.
+ * de líder, coordenação e auditoria. Lista compacta (não um card cheio por
+ * linha) com contador, filtro rápido e busca. O badge de status só ganha
+ * cor quando o filtro correspondente está selecionado — do contrário fica
+ * neutro, igual aos outros, para reduzir a poluição visual.
  */
 export function PendenciasPainel({ itens, renderAcoes }: PendenciasPainelProps) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -105,12 +121,12 @@ export function PendenciasPainel({ itens, renderAcoes }: PendenciasPainelProps) 
         {FILTROS.map((f) => (
           <button
             key={f.chave}
-            onClick={() => setFiltro(f.chave)}
+            onClick={() => setFiltro((atual) => (atual === f.chave ? "todos" : f.chave))}
             className={[
               "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
               filtro === f.chave
                 ? "border-primary bg-primary text-white"
-                : "border-ink/15 bg-white text-ink/60 hover:bg-surface",
+                : "border-ink/15 bg-white text-ink/60 hover:bg-surface dark:border-white/15 dark:bg-[#242424] dark:text-white/60 dark:hover:bg-white/5",
             ].join(" ")}
           >
             {f.label} ({contagens[f.chave]})
@@ -122,56 +138,50 @@ export function PendenciasPainel({ itens, renderAcoes }: PendenciasPainelProps) 
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
         placeholder="Buscar por matrícula ou nome..."
-        className="h-11 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="h-11 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border-white/15 dark:bg-[#242424] dark:text-white"
       />
 
       {filtrados.length === 0 ? (
         <Card>
-          <CardBody className="py-10 text-center text-sm text-ink/50">
+          <CardBody className="py-10 text-center text-sm text-ink/50 dark:text-white/50">
             Nenhum colaborador encontrado para esse filtro.
           </CardBody>
         </Card>
       ) : (
-        <div className="flex flex-col gap-2">
-          {filtrados.map((item) => {
-            const destacado = destacarFaltas && item.status === "FALTA";
-            return (
-              <Card
-                key={item.id}
-                className={destacado ? "border-danger/40 bg-danger/5" : undefined}
-              >
-                <CardBody className="flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className={["text-sm font-semibold", destacado ? "text-danger" : "text-ink"].join(" ")}>
-                        {item.colaborador_nome ?? "Colaborador"}
-                      </p>
-                      <p className="text-xs text-ink/50">
-                        {item.colaborador_matricula && <>Matrícula {item.colaborador_matricula} · </>}
-                        {item.filial_nome}
-                      </p>
-                      {item.status === "OUTROS" && (
-                        <p className="mt-1 text-xs text-ink/60">
-                          {item.motivo_outros}
-                          {item.observacao ? ` · ${item.observacao}` : ""}
-                        </p>
-                      )}
-                    </div>
-                    <span
-                      className={[
-                        "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold",
-                        destacado ? "bg-danger text-white" : "bg-surface text-ink/70",
-                      ].join(" ")}
-                    >
+        <Card>
+          <ul className="divide-y divide-ink/5 dark:divide-white/5">
+            {filtrados.map((item) => {
+              const destacado = destacarFaltas && item.status === "FALTA" && filtro === "todos";
+              const corBadge = filtro !== "todos" && pertenceAoFiltro(item.status, filtro) ? CORES_QUANDO_ATIVO[filtro] : NEUTRO;
+              return (
+                <li
+                  key={item.id}
+                  className={[
+                    "flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
+                    destacado ? "bg-danger/5" : "",
+                  ].join(" ")}
+                >
+                  <div className="min-w-0">
+                    <p className={["truncate text-sm font-semibold", destacado ? "text-danger" : "text-ink dark:text-white"].join(" ")}>
+                      {item.colaborador_nome ?? "Colaborador"}
+                    </p>
+                    <p className="truncate text-xs text-ink/50 dark:text-white/50">
+                      {item.colaborador_matricula && <>Matrícula {item.colaborador_matricula} · </>}
+                      {item.filial_nome}
+                      {item.status === "OUTROS" && item.motivo_outros ? ` · ${item.motivo_outros}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className={["rounded-full px-2.5 py-1 text-xs font-semibold", corBadge].join(" ")}>
                       {STATUS_DIA_LABEL[item.status]}
                     </span>
+                    {renderAcoes?.(item)}
                   </div>
-                  {renderAcoes && <div className="border-t border-ink/10 pt-3">{renderAcoes(item)}</div>}
-                </CardBody>
-              </Card>
-            );
-          })}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
     </div>
   );

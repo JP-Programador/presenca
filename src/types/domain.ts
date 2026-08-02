@@ -41,11 +41,15 @@ export interface Filial {
 export interface Colaborador {
   id: string;
   filial_id: string;
+  lider_id: string | null;
   matricula: string;
   nome: string;
   cargo: string | null;
   tipo_contrato: TipoContrato;
   ativo: boolean;
+  // campos "achatados" via join
+  filial_nome?: string;
+  lider_nome?: string;
 }
 
 export interface RegistroPresenca {
@@ -95,6 +99,7 @@ export interface AuditLogEntry {
 
 export interface UsuarioComHierarquia extends PerfilUsuario {
   filial_home_nome?: string | null;
+  coordenador_nome?: string | null;
   filiais_gerenciadas: { id: string; nome: string }[];
   ativo: boolean;
 }
@@ -118,4 +123,6 @@ export interface PerfilUsuario {
   email: string;
   perfil: PerfilAcesso;
   filial_id: string | null;
+  coordenador_id?: string | null;
+  senha_temporaria?: boolean;
 }

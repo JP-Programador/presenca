@@ -11,7 +11,7 @@ export async function obterSessaoAtual() {
 export async function buscarPerfil(userId: string): Promise<PerfilUsuario | null> {
   const { data, error } = await supabase
     .from("perfis")
-    .select("id, nome, email, perfil, filial_id")
+    .select("id, nome, email, perfil, filial_id, coordenador_id, senha_temporaria")
     .eq("id", userId)
     .single();
 
@@ -57,4 +57,13 @@ export async function solicitarRedefinicaoSenha(email: string, usuarioId?: strin
   const { error } = await supabase.auth.resetPasswordForEmail(email);
   if (!error) await registrarEventoAuditoria("senha_redefinida_solicitada", usuarioId);
   return { error: error?.message ?? null };
+}
+
+/** Troca a senha do usuário logado e derruba a flag senha_temporaria (força de troca no 1º acesso). */
+export async function definirNovaSenha(novaSenha: string, userId: string) {
+  const { error: erroSenha } = await supabase.auth.updateUser({ password: novaSenha });
+  if (erroSenha) return { error: erroSenha.message };
+
+  const { error: erroFlag } = await supabase.from("perfis").update({ senha_temporaria: false }).eq("id", userId);
+  return { error: erroFlag?.message ?? null };
 }

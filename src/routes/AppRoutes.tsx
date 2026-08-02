@@ -21,13 +21,18 @@ const AuditoriaDashboard = lazy(() =>
 const UsuariosGestao = lazy(() =>
   import("@/pages/UsuariosGestao").then((m) => ({ default: m.UsuariosGestao }))
 );
+const ColaboradoresGestao = lazy(() =>
+  import("@/pages/ColaboradoresGestao").then((m) => ({ default: m.ColaboradoresGestao }))
+);
 
 // Hierarquia: admin > coordenador > gestor > colaborador, com auditor no
 // mesmo nível de LEITURA do admin (mas sem nenhuma escrita).
 // - Visão global (mapa/ranking/log): admin, auditor e coordenador.
-// - Gestão de usuários e hierarquia: exclusiva do admin.
+// - Gestão de usuários (líderes+): admin cria qualquer papel; coordenador só cria líderes.
+// - Gestão de colaboradores: líder (só os seus), coordenador e admin.
 const PAPEIS_VISAO_GLOBAL = ["admin", "auditor", "coordenador"] as const;
-const PAPEIS_GESTAO_USUARIOS = ["admin"] as const;
+const PAPEIS_GESTAO_USUARIOS = ["admin", "coordenador"] as const;
+const PAPEIS_GESTAO_COLABORADORES = ["admin", "coordenador", "gestor"] as const;
 
 export function AppRoutes() {
   return (
@@ -72,13 +77,25 @@ export function AppRoutes() {
         }
       />
 
-      {/* Gestão de usuários e hierarquia — exclusiva do admin */}
+      {/* Gestão de usuários e hierarquia — admin (qualquer papel) e coordenador (só líderes) */}
       <Route
         path="/usuarios"
         element={
           <RequireRole roles={[...PAPEIS_GESTAO_USUARIOS]} fallback="/coordenador">
             <Suspense fallback={<LoadingScreen />}>
               <UsuariosGestao />
+            </Suspense>
+          </RequireRole>
+        }
+      />
+
+      {/* Gestão de colaboradores — líder (só os seus), coordenador e admin */}
+      <Route
+        path="/colaboradores"
+        element={
+          <RequireRole roles={[...PAPEIS_GESTAO_COLABORADORES]} fallback="/lider">
+            <Suspense fallback={<LoadingScreen />}>
+              <ColaboradoresGestao />
             </Suspense>
           </RequireRole>
         }

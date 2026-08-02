@@ -3,11 +3,14 @@ import { Button } from "@/components/ui/Button";
 import type { PerfilAcesso } from "@/types/domain";
 
 const VISAO_GLOBAL: PerfilAcesso[] = ["admin", "auditor", "coordenador"];
+const GESTAO_USUARIOS: PerfilAcesso[] = ["admin", "coordenador"];
+const GESTAO_COLABORADORES: PerfilAcesso[] = ["admin", "coordenador", "gestor"];
 
 /**
  * Links de navegação entre os painéis administrativos + botão sair,
  * mostrados conforme a hierarquia: coordenação/auditoria para quem tem
- * visão global (admin, auditor, coordenador); usuários só para admin.
+ * visão global (admin, auditor, coordenador); usuários para admin/coordenador;
+ * colaboradores para gestor/coordenador/admin.
  */
 export function NavPaineis({
   perfil,
@@ -15,7 +18,7 @@ export function NavPaineis({
   onSair,
 }: {
   perfil: PerfilAcesso;
-  atual: "lider" | "coordenador" | "auditoria" | "usuarios";
+  atual: "lider" | "coordenador" | "auditoria" | "usuarios" | "colaboradores";
   onSair: () => void;
 }) {
   const temVisaoGlobal = VISAO_GLOBAL.includes(perfil);
@@ -32,7 +35,12 @@ export function NavPaineis({
           Auditoria
         </Link>
       )}
-      {atual !== "usuarios" && perfil === "admin" && (
+      {atual !== "colaboradores" && GESTAO_COLABORADORES.includes(perfil) && (
+        <Link to="/colaboradores" className="text-sm font-semibold text-primary hover:underline">
+          Colaboradores
+        </Link>
+      )}
+      {atual !== "usuarios" && GESTAO_USUARIOS.includes(perfil) && (
         <Link to="/usuarios" className="text-sm font-semibold text-primary hover:underline">
           Usuários
         </Link>

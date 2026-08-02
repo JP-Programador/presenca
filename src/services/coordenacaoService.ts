@@ -74,7 +74,9 @@ export async function listarFiliais(): Promise<Filial[]> {
 export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
   const { data, error } = await supabase
     .from("perfis")
-    .select("id, nome, email, perfil, filial_id, ativo, filiais(nome), gestor_filiais(filial_id, filiais(id, nome))")
+    .select(
+      "id, nome, email, perfil, filial_id, ativo, coordenador_id, filiais(nome), gestor_filiais(filial_id, filiais(id, nome)), coordenador:coordenador_id(nome)"
+    )
     .order("nome");
 
   if (error) throw error;
@@ -86,12 +88,43 @@ export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
     perfil: row.perfil,
     filial_id: row.filial_id,
     ativo: row.ativo,
+    coordenador_id: row.coordenador_id,
     filial_home_nome: row.filiais?.nome ?? null,
+    coordenador_nome: row.coordenador?.nome ?? null,
     filiais_gerenciadas: (row.gestor_filiais ?? []).map((gf: any) => ({
       id: gf.filiais.id,
       nome: gf.filiais.nome,
     })),
   }));
+}
+
+export interface PessoaSimples {
+  id: string;
+  nome: string;
+}
+
+/** Líderes (perfil=gestor) ativos — usado no seletor "líder direto" ao criar colaborador. */
+export async function listarLideres(): Promise<PessoaSimples[]> {
+  const { data, error } = await supabase
+    .from("perfis")
+    .select("id, nome")
+    .eq("perfil", "gestor")
+    .eq("ativo", true)
+    .order("nome");
+  if (error) throw error;
+  return (data ?? []) as PessoaSimples[];
+}
+
+/** Coordenadores ativos — usado no seletor "coordenador direto" ao criar líder. */
+export async function listarCoordenadores(): Promise<PessoaSimples[]> {
+  const { data, error } = await supabase
+    .from("perfis")
+    .select("id, nome")
+    .eq("perfil", "coordenador")
+    .eq("ativo", true)
+    .order("nome");
+  if (error) throw error;
+  return (data ?? []) as PessoaSimples[];
 }
 
 export async function atualizarPapelUsuario(
@@ -128,6 +161,8 @@ export interface NovoUsuarioInput {
   perfil: UsuarioComHierarquia["perfil"];
   filial_id?: string | null;
   filiais_gerenciadas?: string[];
+  /** Coordenador direto — só relevante quando perfil = 'gestor' e quem cria é admin (coordenador vira o próprio automaticamente). */
+  coordenador_id?: string | null;
 }
 
 /** Cria um novo usuário via Edge Function (precisa de service_role para o Admin API). */

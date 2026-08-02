@@ -12,6 +12,7 @@ import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
 import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
+import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
 import { useAuth } from "@/providers/AuthProvider";
 import { hojeISO } from "@/lib/calendario";
 import { listarRankingLideres, listarRegistrosParaMapa } from "@/services/coordenacaoService";
@@ -101,7 +102,7 @@ export function CoordenadorDashboard() {
   const ehAuditor = usuario.perfil === "auditor";
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
       <BrandHeader
         title="Painel de coordenação"
         subtitle="Visão consolidada de todas as filiais"
@@ -129,8 +130,8 @@ export function CoordenadorDashboard() {
         <Card className="mb-6">
           <CardHeader className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-ink">Mapa das presenças</h2>
-              <p className="text-xs text-ink/50">Registros com localização capturada.</p>
+              <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa das presenças</h2>
+              <p className="text-xs text-ink/50 dark:text-white/50">Registros com localização capturada.</p>
             </div>
             <div className="flex gap-1 rounded-md bg-surface p-1">
               {[
@@ -143,7 +144,7 @@ export function CoordenadorDashboard() {
                   onClick={() => setJanela(opcao.valor as 24 | 72 | 168)}
                   className={[
                     "rounded px-2.5 py-1 text-xs font-semibold",
-                    janela === opcao.valor ? "bg-white text-primary shadow-sm" : "text-ink/50",
+                    janela === opcao.valor ? "bg-white text-primary shadow-sm" : "text-ink/50 dark:text-white/50",
                   ].join(" ")}
                 >
                   {opcao.label}
@@ -158,8 +159,8 @@ export function CoordenadorDashboard() {
 
         <Card className="mb-6">
           <CardHeader>
-            <h2 className="text-sm font-semibold text-ink">Exportações</h2>
-            <p className="text-xs text-ink/50">Relatórios de presença, pendências, rejeições e auditoria.</p>
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Exportações</h2>
+            <p className="text-xs text-ink/50 dark:text-white/50">Relatórios de presença, pendências, rejeições e auditoria.</p>
           </CardHeader>
           <CardBody>
             <RelatoriosExport />
@@ -168,8 +169,8 @@ export function CoordenadorDashboard() {
 
         <Card className="mb-6">
           <CardHeader>
-            <h2 className="text-sm font-semibold text-ink">Mapa operacional (hoje)</h2>
-            <p className="text-xs text-ink/50">
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa operacional (hoje)</h2>
+            <p className="text-xs text-ink/50 dark:text-white/50">
               Status do dia de cada colaborador, com localização quando disponível.
             </p>
           </CardHeader>
@@ -180,8 +181,20 @@ export function CoordenadorDashboard() {
 
         <Card className="mb-6">
           <CardHeader>
-            <h2 className="text-sm font-semibold text-ink">Pendências e cobrança</h2>
-            <p className="text-xs text-ink/50">Status do dia de todos os colaboradores, todas as filiais.</p>
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Geral — nome e status</h2>
+            <p className="text-xs text-ink/50 dark:text-white/50">
+              Consulte qualquer dia, filtrando por status e nome.
+            </p>
+          </CardHeader>
+          <CardBody>
+            <TabelaGeralStatus />
+          </CardBody>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Pendências e cobrança</h2>
+            <p className="text-xs text-ink/50 dark:text-white/50">Status do dia de todos os colaboradores, todas as filiais.</p>
           </CardHeader>
           <CardBody>
             {carregandoDados ? (
@@ -229,8 +242,8 @@ export function CoordenadorDashboard() {
         <Card className="mb-6">
           <CardHeader className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-ink">Ranking de líderes</h2>
-              <p className="text-xs text-ink/50">Ordenado por % de decisões dentro do SLA de 2h.</p>
+              <h2 className="text-sm font-semibold text-ink dark:text-white">Ranking de líderes</h2>
+              <p className="text-xs text-ink/50 dark:text-white/50">Ordenado por % de decisões dentro do SLA de 2h.</p>
             </div>
             <ExportButtons
               dados={ranking}
@@ -260,8 +273,8 @@ export function CoordenadorDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-semibold text-ink">SLA de aprovação — status do dia</h2>
-            <p className="text-xs text-ink/50">
+            <h2 className="text-sm font-semibold text-ink dark:text-white">SLA de aprovação — status do dia</h2>
+            <p className="text-xs text-ink/50 dark:text-white/50">
               Tempo entre o envio da presença (PENDENTE) e a decisão do líder. Verde ≤15min, amarelo 15-30min,
               vermelho &gt;30min.
             </p>
@@ -280,15 +293,15 @@ export function CoordenadorDashboard() {
                 />
                 {mediasDiariasRecentes.length > 0 && (
                   <div>
-                    <p className="mb-2 text-xs font-semibold text-ink/60">Últimos dias</p>
+                    <p className="mb-2 text-xs font-semibold text-ink/60 dark:text-white/60">Últimos dias</p>
                     <div className="flex flex-wrap gap-2">
                       {mediasDiariasRecentes.map((m) => (
                         <div key={m.data} className="rounded-md border border-ink/10 px-3 py-1.5 text-xs">
-                          <span className="text-ink/50">
+                          <span className="text-ink/50 dark:text-white/50">
                             {new Date(m.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
                           </span>{" "}
-                          <span className="font-semibold text-ink">{m.media_min} min</span>{" "}
-                          <span className="text-ink/40">({m.total})</span>
+                          <span className="font-semibold text-ink dark:text-white">{m.media_min} min</span>{" "}
+                          <span className="text-ink/40 dark:text-white/40">({m.total})</span>
                         </div>
                       ))}
                     </div>

@@ -31,15 +31,15 @@ export function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
       <BrandHeader title="Acesso administrativo" subtitle="Painel do líder / gestão" />
 
       <main className="mx-auto flex max-w-sm flex-col justify-center px-4 py-16">
         <Card>
           <CardBody className="flex flex-col gap-5">
             <div>
-              <h2 className="text-base font-semibold text-ink">Entrar</h2>
-              <p className="mt-1 text-sm text-ink/60">
+              <h2 className="text-base font-semibold text-ink dark:text-white">Entrar</h2>
+              <p className="mt-1 text-sm text-ink/60 dark:text-white/60">
                 Acesso restrito a líderes e administradores da TLP.
               </p>
             </div>

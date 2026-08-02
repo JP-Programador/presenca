@@ -1,19 +1,24 @@
 // supabase/functions/admin-criar-usuario/index.ts
 //
 // Cria um novo usuário de login (auth.users) + a linha correspondente em
-// tlp_presenca.perfis. Só pode ser chamada por um usuário autenticado cujo perfil
-// seja 'admin' — gestão de usuários/hierarquia é exclusiva do admin (o
-// coordenador tem leitura global, mas não gerencia pessoas; o auditor só lê).
+// tlp_presenca.perfis. Sem convite por e-mail: o usuário nasce com a senha
+// fixa "Mudar@123" e a flag senha_temporaria=true, que obriga a troca no
+// primeiro acesso (ver TrocarSenhaObrigatoria.tsx no frontend).
+//
+// Quem pode chamar: admin cria qualquer papel; coordenador só pode criar
+// 'gestor' (líder), e nesse caso o coordenador_id do novo líder é sempre o
+// próprio coordenador chamador (ignora qualquer valor enviado no payload).
 //
 // verify_jwt fica true (padrão) no config.toml: o Supabase já garante que
-// só chega aqui uma requisição com um JWT válido; a checagem de PAPEL
-// (admin/coordenador) é feita manualmente abaixo.
+// só chega aqui uma requisição com um JWT válido; a checagem de PAPEL é
+// feita manualmente abaixo.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SENHA_INICIAL = "Mudar@123";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +39,7 @@ interface CriarUsuarioPayload {
   perfil: "admin" | "auditor" | "coordenador" | "gestor" | "colaborador";
   filial_id?: string | null;
   filiais_gerenciadas?: string[]; // usado quando perfil = 'gestor'
+  coordenador_id?: string | null; // usado quando perfil = 'gestor' e quem cria é admin
 }
 
 Deno.serve(async (req: Request) => {
@@ -63,8 +69,14 @@ Deno.serve(async (req: Request) => {
     .eq("id", user.id)
     .single();
 
-  if (!perfilChamador || perfilChamador.perfil !== "admin") {
-    return json({ error: "sem_permissao", mensagem: "Apenas o administrador pode criar usuários." }, 403);
+  const ehAdmin = perfilChamador?.perfil === "admin";
+  const ehCoordenador = perfilChamador?.perfil === "coordenador";
+
+  if (!ehAdmin && !ehCoordenador) {
+    return json(
+      { error: "sem_permissao", mensagem: "Apenas administrador ou coordenador podem criar usuários." },
+      403
+    );
   }
 
   let payload: CriarUsuarioPayload;
@@ -78,25 +90,43 @@ Deno.serve(async (req: Request) => {
     return json({ error: "campos_obrigatorios" }, 400);
   }
 
+  // Coordenador só pode criar líderes (gestor) — vira o coordenador direto
+  // do novo líder automaticamente, ignorando qualquer valor enviado.
+  if (ehCoordenador && payload.perfil !== "gestor") {
+    return json(
+      { error: "sem_permissao", mensagem: "Coordenador só pode criar líderes (gestor)." },
+      403
+    );
+  }
+  const coordenadorId = ehCoordenador ? user.id : payload.coordenador_id ?? null;
+
   const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     db: { schema: "tlp_presenca" },
   });
 
-  // 1. Cria o usuário e dispara e-mail de convite (define a própria senha)
-  const { data: novoUsuario, error: erroCriacao } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-    payload.email,
-    { data: { nome: payload.nome } }
-  );
+  // 1. Cria o usuário já com senha fixa (sem e-mail de convite) — o próprio
+  // usuário troca no primeiro acesso (senha_temporaria, ver passo 2).
+  const { data: novoUsuario, error: erroCriacao } = await supabaseAdmin.auth.admin.createUser({
+    email: payload.email,
+    password: SENHA_INICIAL,
+    email_confirm: true,
+    user_metadata: { nome: payload.nome },
+  });
 
   if (erroCriacao || !novoUsuario.user) {
     return json({ error: "falha_criar_usuario", mensagem: erroCriacao?.message }, 500);
   }
 
   // 2. Atualiza o perfil criado automaticamente pelo trigger handle_new_user
-  //    (migration 0004) com o papel e a filial corretos.
+  //    (migration 0004) com o papel, filial e hierarquia corretos.
   const { error: erroPerfil } = await supabaseAdmin
     .from("perfis")
-    .update({ perfil: payload.perfil, filial_id: payload.filial_id ?? null })
+    .update({
+      perfil: payload.perfil,
+      filial_id: payload.filial_id ?? null,
+      coordenador_id: payload.perfil === "gestor" ? coordenadorId : null,
+      senha_temporaria: true,
+    })
     .eq("id", novoUsuario.user.id);
 
   if (erroPerfil) {

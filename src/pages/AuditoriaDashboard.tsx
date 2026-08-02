@@ -100,7 +100,7 @@ export function AuditoriaDashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
       <BrandHeader
         title="Auditoria"
         subtitle="Trilha de ações sensíveis do sistema"
@@ -116,8 +116,8 @@ export function AuditoriaDashboard() {
 
         <Card className="mb-6">
           <CardHeader>
-            <h2 className="text-sm font-semibold text-ink">Pendências e cobrança</h2>
-            <p className="text-xs text-ink/50">Status do dia de todos os colaboradores (somente leitura).</p>
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Pendências e cobrança</h2>
+            <p className="text-xs text-ink/50 dark:text-white/50">Status do dia de todos os colaboradores (somente leitura).</p>
           </CardHeader>
           <CardBody>
             {carregandoStatusDia ? (

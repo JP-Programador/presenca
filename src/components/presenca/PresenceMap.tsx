@@ -27,6 +27,7 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceM
   const [lideresPorFilial, setLideresPorFilial] = useState<LiderFilial[]>([]);
   const [filialFiltro, setFilialFiltro] = useState("");
   const [liderFiltro, setLiderFiltro] = useState("");
+  const [nomeFiltro, setNomeFiltro] = useState("");
 
   useEffect(() => {
     if (somenteExibicao) return;
@@ -53,12 +54,14 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceM
   }, [lideresPorFilial, liderFiltro]);
 
   const filtrados = useMemo(() => {
+    const termo = nomeFiltro.trim().toLowerCase();
     return pontos.filter((p) => {
       if (filialFiltro && p.filial_id !== filialFiltro) return false;
       if (filialIdsDoLider && !filialIdsDoLider.has(p.filial_id)) return false;
+      if (termo && !p.colaborador_nome?.toLowerCase().includes(termo)) return false;
       return true;
     });
-  }, [pontos, filialFiltro, filialIdsDoLider]);
+  }, [pontos, filialFiltro, filialIdsDoLider, nomeFiltro]);
 
   const comCoordenadas = filtrados.filter((p) => p.latitude != null && p.longitude != null);
   const faltasSemLocalizacao = filtrados.filter((p) => p.status === "FALTA" && p.latitude == null).length;
@@ -72,10 +75,16 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceM
     <div className="flex flex-col gap-3">
       {!somenteExibicao && (
         <div className="flex flex-wrap gap-2">
+          <input
+            value={nomeFiltro}
+            onChange={(e) => setNomeFiltro(e.target.value)}
+            placeholder="Buscar colaborador..."
+            className="h-10 flex-1 min-w-[160px] rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+          />
           <select
             value={filialFiltro}
             onChange={(e) => setFilialFiltro(e.target.value)}
-            className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink"
+            className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
           >
             <option value="">Todas as filiais</option>
             {filiais.map((f) => (
@@ -87,7 +96,7 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceM
           <select
             value={liderFiltro}
             onChange={(e) => setLiderFiltro(e.target.value)}
-            className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink"
+            className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
           >
             <option value="">Todos os líderes</option>
             {lideres.map((l) => (

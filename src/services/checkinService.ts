@@ -23,6 +23,20 @@ export interface CheckinErro {
   mensagem: string;
 }
 
+export interface ValidacaoColaborador {
+  encontrado: boolean;
+  nome?: string;
+}
+
+/** Confirma, enquanto o técnico digita, se existe um colaborador ativo pra essa filial+matrícula (sem gravar nada). */
+export async function validarColaborador(codigoFilial: string, matricula4: string): Promise<ValidacaoColaborador> {
+  const { data, error } = await supabase.functions.invoke("validar-colaborador", {
+    body: { codigo_filial: codigoFilial, matricula4 },
+  });
+  if (error || !data) return { encontrado: false };
+  return data as ValidacaoColaborador;
+}
+
 /** Chama a Edge Function `checkin-publico`, usada pela tela do técnico (sem login). */
 export async function enviarCheckin(input: CheckinInput): Promise<CheckinResultado | CheckinErro> {
   const { data, error } = await supabase.functions.invoke("checkin-publico", {

@@ -8,7 +8,8 @@ import { ExportButtons } from "@/components/ui/ExportButtons";
 import { NovoUsuarioForm } from "@/components/presenca/NovoUsuarioForm";
 import { UsuarioRow } from "@/components/presenca/UsuarioRow";
 import { useAuth } from "@/providers/AuthProvider";
-import { listarFiliais, listarUsuarios } from "@/services/coordenacaoService";
+import { listarCoordenadores, listarFiliais, listarUsuarios } from "@/services/coordenacaoService";
+import type { PessoaSimples } from "@/services/coordenacaoService";
 import type { Filial, UsuarioComHierarquia } from "@/types/domain";
 
 const PAPEL_LABEL: Record<string, string> = {
@@ -24,6 +25,7 @@ export function UsuariosGestao() {
   const { usuario, sair } = useAuth();
   const [usuarios, setUsuarios] = useState<UsuarioComHierarquia[]>([]);
   const [filiais, setFiliais] = useState<Filial[]>([]);
+  const [coordenadores, setCoordenadores] = useState<PessoaSimples[]>([]);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -32,9 +34,10 @@ export function UsuariosGestao() {
     setCarregandoLista(true);
     setErro(null);
     try {
-      const [users, fils] = await Promise.all([listarUsuarios(), listarFiliais()]);
+      const [users, fils, coords] = await Promise.all([listarUsuarios(), listarFiliais(), listarCoordenadores()]);
       setUsuarios(users);
       setFiliais(fils);
+      setCoordenadores(coords);
     } catch {
       setErro("Não foi possível carregar os usuários.");
     } finally {
@@ -63,7 +66,7 @@ export function UsuariosGestao() {
   }));
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
       <BrandHeader
         title="Usuários e hierarquia"
         subtitle="Administradores, auditores, coordenadores, gestores e colaboradores"
@@ -79,21 +82,26 @@ export function UsuariosGestao() {
 
         <Card className="mb-6">
           <CardHeader className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">Novo usuário</h2>
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Novo usuário</h2>
             <Button variant="ghost" size="md" onClick={() => setMostrarFormulario((v) => !v)}>
-              {mostrarFormulario ? "Fechar" : "Convidar usuário"}
+              {mostrarFormulario ? "Fechar" : "Novo usuário"}
             </Button>
           </CardHeader>
           {mostrarFormulario && (
             <CardBody>
-              <NovoUsuarioForm filiais={filiais} onCriado={carregar} />
+              <NovoUsuarioForm
+                filiais={filiais}
+                coordenadores={coordenadores}
+                perfilCriador={usuario.perfil}
+                onCriado={carregar}
+              />
             </CardBody>
           )}
         </Card>
 
         <Card>
           <CardHeader className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">Hierarquia de acesso</h2>
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Hierarquia de acesso</h2>
             <ExportButtons
               dados={dadosExportacao}
               nomeBase="usuarios"

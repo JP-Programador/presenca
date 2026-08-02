@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/providers/AuthProvider";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { TrocarSenhaObrigatoria } from "@/pages/TrocarSenhaObrigatoria";
 import type { PerfilAcesso } from "@/types/domain";
 
 interface RequireRoleProps {
@@ -22,6 +23,7 @@ export function RequireRole({ roles, children, fallback = "/lider" }: RequireRol
 
   if (carregando) return <LoadingScreen />;
   if (!usuario) return <Navigate to="/admin" replace />;
+  if (usuario.senha_temporaria) return <TrocarSenhaObrigatoria />;
   if (!roles.includes(usuario.perfil)) return <Navigate to={fallback} replace />;
 
   return <>{children}</>;

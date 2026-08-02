@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrandHeader } from "@/components/layout/BrandHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -7,60 +7,82 @@ import { Alert } from "@/components/ui/Alert";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { useCamera } from "@/hooks/useCamera";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { enviarCheckin } from "@/services/checkinService";
-import type { TipoMarcacao } from "@/types/domain";
+import { enviarCheckin, validarColaborador } from "@/services/checkinService";
 
-const TIPOS: { valor: TipoMarcacao; label: string }[] = [
-  { valor: "entrada", label: "Entrada" },
-  { valor: "inicio_intervalo", label: "Início do intervalo" },
-  { valor: "fim_intervalo", label: "Fim do intervalo" },
-  { valor: "saida", label: "Saída" },
-];
+type StatusValidacao = "vazio" | "verificando" | "encontrado" | "nao_encontrado";
 
-type Etapa = "identificacao" | "captura" | "enviando" | "sucesso";
-
+/**
+ * Tela pública de presença — hoje só marca ENTRADA (as demais marcações
+ * ficam pra quando o fluxo completo de jornada for habilitado). Tudo numa
+ * tela só: identificação, câmera e GPS aparecem juntos; a matrícula é
+ * validada ao vivo (debounce) e barra o envio se não achar o colaborador.
+ */
 export function TecnicoCheckin() {
-  const [etapa, setEtapa] = useState<Etapa>("identificacao");
   const [codigoFilial, setCodigoFilial] = useState("");
   const [matricula4, setMatricula4] = useState("");
-  const [tipo, setTipo] = useState<TipoMarcacao>("entrada");
+  const [statusValidacao, setStatusValidacao] = useState<StatusValidacao>("vazio");
+  const [nomeEncontrado, setNomeEncontrado] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<{ nome: string; status: string; horario: string } | null>(
-    null
-  );
+  const [resultado, setResultado] = useState<{ nome: string; status: string; horario: string } | null>(null);
 
   const camera = useCamera();
   const geo = useGeolocation();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const podeAvancarIdentificacao = codigoFilial.trim().length > 0 && matricula4.trim().length === 4;
-  const podeEnviar = camera.pronto && geo.pronto;
+  // Validação ao vivo: assim que filial + 4 dígitos estão preenchidos, confirma
+  // no servidor (debounced) se existe colaborador ativo com esses dados.
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
 
-  function iniciarCaptura(e: FormEvent) {
-    e.preventDefault();
-    if (!podeAvancarIdentificacao) return;
-    setEtapa("captura");
-    camera.iniciar();
-    geo.capturar();
-  }
+    if (codigoFilial.trim().length === 0 || matricula4.length !== 4) {
+      setStatusValidacao("vazio");
+      setNomeEncontrado(null);
+      return;
+    }
+
+    setStatusValidacao("verificando");
+    debounceRef.current = setTimeout(async () => {
+      const resposta = await validarColaborador(codigoFilial.trim(), matricula4);
+      if (resposta.encontrado) {
+        setStatusValidacao("encontrado");
+        setNomeEncontrado(resposta.nome ?? null);
+        if (camera.status === "idle") camera.iniciar();
+        geo.capturar();
+      } else {
+        setStatusValidacao("nao_encontrado");
+        setNomeEncontrado(null);
+      }
+    }, 500);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codigoFilial, matricula4]);
+
+  const identificado = statusValidacao === "encontrado";
+  const podeEnviar = identificado && camera.pronto && geo.pronto;
 
   async function enviarPresenca() {
     if (!podeEnviar || !camera.fotoDataUrl || !geo.coords) return;
-    setEtapa("enviando");
+    setEnviando(true);
     setErroEnvio(null);
 
     const resposta = await enviarCheckin({
       codigoFilial: codigoFilial.trim(),
-      matricula4: matricula4.trim(),
-      tipo,
+      matricula4,
+      tipo: "entrada",
       fotoDataUrl: camera.fotoDataUrl,
       latitude: geo.coords.latitude,
       longitude: geo.coords.longitude,
       precisao: geo.coords.precisao,
     });
 
+    setEnviando(false);
+
     if (!resposta.ok) {
       setErroEnvio(resposta.mensagem);
-      setEtapa("captura");
       return;
     }
 
@@ -72,197 +94,31 @@ export function TecnicoCheckin() {
         minute: "2-digit",
       }),
     });
-    setEtapa("sucesso");
   }
 
   function registrarNovamente() {
-    setEtapa("identificacao");
     setCodigoFilial("");
     setMatricula4("");
-    setTipo("entrada");
+    setStatusValidacao("vazio");
+    setNomeEncontrado(null);
     setErroEnvio(null);
     setResultado(null);
   }
 
   return (
-    <div className="min-h-screen bg-surface">
-      <BrandHeader title="Registro de presença" subtitle="Ponto do técnico em campo" />
+    <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
+      <BrandHeader title="Registro de presença" subtitle="Entrada do técnico em campo" />
 
       <main className="mx-auto max-w-md px-4 py-6 sm:py-10">
-        {etapa === "identificacao" && (
-          <Card>
-            <CardBody className="flex flex-col gap-5">
-              <div>
-                <h2 className="text-base font-semibold text-ink">Identifique-se</h2>
-                <p className="mt-1 text-sm text-ink/60">
-                  Informe o código da sua filial e os 4 últimos dígitos da sua matrícula para continuar.
-                </p>
-              </div>
-
-              <form onSubmit={iniciarCaptura} className="flex flex-col gap-4">
-                <Input
-                  id="codigo-filial"
-                  label="Código da filial"
-                  placeholder="Ex.: 1768"
-                  value={codigoFilial}
-                  onChange={(e) => setCodigoFilial(e.target.value)}
-                  autoComplete="off"
-                  inputMode="numeric"
-                  required
-                />
-                <Input
-                  id="matricula4"
-                  label="4 últimos dígitos da matrícula"
-                  placeholder="0000"
-                  value={matricula4}
-                  onChange={(e) => setMatricula4(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  autoComplete="off"
-                  inputMode="numeric"
-                  maxLength={4}
-                  required
-                />
-
-                <div>
-                  <span className="mb-1.5 block text-sm font-medium text-ink">Tipo de marcação</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {TIPOS.map((opcao) => (
-                      <button
-                        type="button"
-                        key={opcao.valor}
-                        onClick={() => setTipo(opcao.valor)}
-                        className={[
-                          "rounded-md border px-3 py-2.5 text-sm font-semibold transition-colors",
-                          tipo === opcao.valor
-                            ? "border-primary bg-[#FDE9DD] text-primary-dark"
-                            : "border-ink/15 bg-white text-ink/70 hover:bg-surface",
-                        ].join(" ")}
-                      >
-                        {opcao.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <Button type="submit" size="lg" fullWidth disabled={!podeAvancarIdentificacao}>
-                  Continuar
-                </Button>
-              </form>
-            </CardBody>
-          </Card>
-        )}
-
-        {etapa === "captura" && (
-          <div className="flex flex-col gap-4">
-            <div className="flex gap-2">
-              <StatusChip
-                label={camera.pronto ? "Foto capturada" : "Foto obrigatória"}
-                ok={camera.pronto}
-                pending={camera.status === "solicitando" || camera.status === "ativa"}
-                icon={<i className="not-italic">📷</i>}
-              />
-              <StatusChip
-                label={geo.pronto ? "GPS capturado" : "GPS obrigatório"}
-                ok={geo.pronto}
-                pending={geo.status === "solicitando"}
-                icon={<i className="not-italic">📍</i>}
-              />
-            </div>
-
-            {(camera.erro || geo.erro || erroEnvio) && (
-              <Alert variant="danger" title="Não foi possível continuar">
-                {camera.erro || geo.erro || erroEnvio}
-              </Alert>
-            )}
-
-            <Card>
-              <CardBody className="flex flex-col gap-4">
-                <div className="overflow-hidden rounded-md bg-ink/5">
-                  {camera.status !== "capturada" ? (
-                    <video
-                      ref={camera.videoRef}
-                      className="aspect-square w-full object-cover"
-                      playsInline
-                      muted
-                    />
-                  ) : (
-                    <img
-                      src={camera.fotoDataUrl ?? undefined}
-                      alt="Foto capturada para o registro de presença"
-                      className="aspect-square w-full object-cover"
-                    />
-                  )}
-                </div>
-
-                {camera.status === "capturada" ? (
-                  <Button variant="secondary" fullWidth onClick={camera.refazer}>
-                    Tirar outra foto
-                  </Button>
-                ) : (
-                  <Button
-                    fullWidth
-                    onClick={camera.capturar}
-                    disabled={camera.status !== "ativa"}
-                    loading={camera.status === "solicitando"}
-                  >
-                    Capturar foto
-                  </Button>
-                )}
-
-                {geo.status !== "capturado" && (
-                  <Button
-                    variant="secondary"
-                    fullWidth
-                    onClick={geo.capturar}
-                    loading={geo.status === "solicitando"}
-                  >
-                    Tentar obter localização novamente
-                  </Button>
-                )}
-
-                <div className="border-t border-ink/10 pt-4">
-                  <Button
-                    size="lg"
-                    fullWidth
-                    disabled={!podeEnviar}
-                    onClick={enviarPresenca}
-                  >
-                    Enviar presença
-                  </Button>
-                  <p className="mt-2 text-center text-xs text-ink/50">
-                    Foto e localização são obrigatórias para concluir o registro.
-                  </p>
-                </div>
-              </CardBody>
-            </Card>
-
-            <button
-              type="button"
-              onClick={registrarNovamente}
-              className="text-center text-sm font-medium text-ink/50 underline-offset-2 hover:underline"
-            >
-              Voltar e corrigir filial/matrícula
-            </button>
-          </div>
-        )}
-
-        {etapa === "enviando" && (
-          <Card>
-            <CardBody className="flex flex-col items-center gap-3 py-10 text-center">
-              <span className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="text-sm font-medium text-ink/70">Enviando sua presença…</p>
-            </CardBody>
-          </Card>
-        )}
-
-        {etapa === "sucesso" && resultado && (
+        {resultado ? (
           <Card>
             <CardBody className="flex flex-col items-center gap-4 py-8 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#E7F3E8] text-2xl text-[#2E7D32]">
                 ✓
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-ink">Presença registrada</h2>
-                <p className="mt-1 text-sm text-ink/60">
+                <h2 className="text-lg font-semibold text-ink dark:text-white">Presença registrada</h2>
+                <p className="mt-1 text-sm text-ink/60 dark:text-white/60">
                   {resultado.nome} · {resultado.horario}
                 </p>
                 {resultado.status === "atrasado" && (
@@ -276,6 +132,118 @@ export function TecnicoCheckin() {
               </Button>
             </CardBody>
           </Card>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <Card>
+              <CardBody className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    id="codigo-filial"
+                    label="Código da filial"
+                    placeholder="Ex.: 1768"
+                    value={codigoFilial}
+                    onChange={(e) => setCodigoFilial(e.target.value)}
+                    autoComplete="off"
+                    inputMode="numeric"
+                  />
+                  <Input
+                    id="matricula4"
+                    label="4 últimos da matrícula"
+                    placeholder="0000"
+                    value={matricula4}
+                    onChange={(e) => setMatricula4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
+                </div>
+
+                {statusValidacao === "verificando" && (
+                  <p className="text-xs font-medium text-ink/50 dark:text-white/50">Verificando…</p>
+                )}
+                {statusValidacao === "encontrado" && nomeEncontrado && (
+                  <p className="text-sm font-semibold text-[#2E7D32]">✓ {nomeEncontrado}</p>
+                )}
+                {statusValidacao === "nao_encontrado" && (
+                  <Alert variant="danger">
+                    Colaborador não encontrado para essa filial/matrícula. Confira os dados ou fale com o seu
+                    líder direto antes de continuar.
+                  </Alert>
+                )}
+              </CardBody>
+            </Card>
+
+            {identificado && (
+              <>
+                <div className="flex gap-2">
+                  <StatusChip
+                    label={camera.pronto ? "Foto capturada" : "Foto obrigatória"}
+                    ok={camera.pronto}
+                    pending={camera.status === "solicitando" || camera.status === "ativa"}
+                    icon={<i className="not-italic">📷</i>}
+                  />
+                  <StatusChip
+                    label={geo.pronto ? "GPS capturado" : "GPS obrigatório"}
+                    ok={geo.pronto}
+                    pending={geo.status === "solicitando"}
+                    icon={<i className="not-italic">📍</i>}
+                  />
+                </div>
+
+                {(camera.erro || geo.erro || erroEnvio) && (
+                  <Alert variant="danger" title="Não foi possível continuar">
+                    {camera.erro || geo.erro || erroEnvio}
+                  </Alert>
+                )}
+
+                <Card>
+                  <CardBody className="flex flex-col gap-4">
+                    <div className="overflow-hidden rounded-md bg-ink/5">
+                      {camera.status !== "capturada" ? (
+                        <video ref={camera.videoRef} className="aspect-square w-full object-cover" playsInline muted />
+                      ) : (
+                        <img
+                          src={camera.fotoDataUrl ?? undefined}
+                          alt="Foto capturada para o registro de presença"
+                          className="aspect-square w-full object-cover"
+                        />
+                      )}
+                    </div>
+
+                    {camera.status === "capturada" ? (
+                      <Button variant="secondary" fullWidth onClick={camera.refazer}>
+                        Tirar outra foto
+                      </Button>
+                    ) : (
+                      <Button
+                        fullWidth
+                        onClick={camera.capturar}
+                        disabled={camera.status !== "ativa"}
+                        loading={camera.status === "solicitando"}
+                      >
+                        Capturar foto
+                      </Button>
+                    )}
+
+                    {geo.status !== "capturado" && (
+                      <Button variant="secondary" fullWidth onClick={geo.capturar} loading={geo.status === "solicitando"}>
+                        Tentar obter localização novamente
+                      </Button>
+                    )}
+
+                    <div className="border-t border-ink/10 pt-4 dark:border-white/10">
+                      <Button size="lg" fullWidth disabled={!podeEnviar} loading={enviando} onClick={enviarPresenca}>
+                        Enviar presença
+                      </Button>
+                      <p className="mt-2 text-center text-xs text-ink/50 dark:text-white/50">
+                        Foto e localização são obrigatórias para concluir o registro.
+                      </p>
+                    </div>
+                  </CardBody>
+                </Card>
+              </>
+            )}
+          </div>
         )}
       </main>
     </div>

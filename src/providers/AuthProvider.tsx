@@ -13,6 +13,8 @@ interface AuthContextValue {
   carregando: boolean;
   entrar: (email: string, senha: string) => Promise<{ error: string | null }>;
   sair: () => Promise<void>;
+  /** Recarrega o perfil do usuário atual (ex.: depois de trocar a senha temporária). */
+  recarregarUsuario: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -53,8 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sairDaSessao();
   }
 
+  async function recarregarUsuario() {
+    if (usuario) await carregarUsuario(usuario.id);
+  }
+
   return (
-    <AuthContext.Provider value={{ usuario, carregando, entrar, sair }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ usuario, carregando, entrar, sair, recarregarUsuario }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 
