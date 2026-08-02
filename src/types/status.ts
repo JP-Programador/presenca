@@ -51,6 +51,7 @@ export interface StatusDiaRegistro {
   colaborador_matricula?: string;
   filial_nome?: string;
   decidido_por_nome?: string;
+  foto_path?: string | null;
 }
 
 export const STATUS_DIA_LABEL: Record<StatusDia, string> = {

@@ -3,7 +3,7 @@ import { transicionar, type EventoStatusDia } from "@/lib/statusMachine";
 import type { StatusDiaRegistro } from "@/types/status";
 
 const SELECT_COLUNAS =
-  "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores(nome, matricula), filiais(nome)";
+  "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores(nome, matricula), filiais(nome), registros_presenca(foto_path)";
 
 function mapearLinha(row: any): StatusDiaRegistro {
   return {
@@ -11,6 +11,7 @@ function mapearLinha(row: any): StatusDiaRegistro {
     colaborador_nome: row.colaboradores?.nome,
     colaborador_matricula: row.colaboradores?.matricula,
     filial_nome: row.filiais?.nome,
+    foto_path: row.registros_presenca?.foto_path ?? null,
   };
 }
 
