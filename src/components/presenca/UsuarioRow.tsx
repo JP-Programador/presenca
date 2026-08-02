@@ -103,12 +103,12 @@ export function UsuarioRow({
           <p className="text-xs text-ink/50">{usuario.email}</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={usuario.perfil}
             disabled={salvando}
             onChange={(e) => mudarPapel(e.target.value as PerfilAcesso)}
-            className="h-9 rounded-md border border-ink/20 bg-white px-2 text-xs font-semibold text-ink"
+            className="h-9 rounded-md border border-ink/20 bg-white px-2 text-xs font-semibold text-ink dark:border-white/20 dark:bg-[#242424] dark:text-white"
           >
             {Object.entries(PAPEL_LABEL).map(([valor, label]) => (
               <option key={valor} value={valor}>

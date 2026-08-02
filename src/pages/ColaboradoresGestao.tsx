@@ -7,16 +7,17 @@ import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { NovoColaboradorForm } from "@/components/presenca/NovoColaboradorForm";
 import { useAuth } from "@/providers/AuthProvider";
-import { listarLideres } from "@/services/coordenacaoService";
+import { listarFiliais, listarLideres } from "@/services/coordenacaoService";
 import type { PessoaSimples } from "@/services/coordenacaoService";
 import { listarColaboradores } from "@/services/colaboradoresService";
-import type { Colaborador } from "@/types/domain";
+import type { Colaborador, Filial } from "@/types/domain";
 
 export function ColaboradoresGestao() {
   // Papel (gestor/coordenador/admin) já validado por <RequireRole> na definição das rotas.
   const { usuario, sair } = useAuth();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [lideres, setLideres] = useState<PessoaSimples[]>([]);
+  const [filiais, setFiliais] = useState<Filial[]>([]);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -26,9 +27,14 @@ export function ColaboradoresGestao() {
     setErro(null);
     try {
       const ehLider = usuario?.perfil === "gestor";
-      const [cols, lids] = await Promise.all([listarColaboradores(), ehLider ? Promise.resolve([]) : listarLideres()]);
+      const [cols, lids, fils] = await Promise.all([
+        listarColaboradores(),
+        ehLider ? Promise.resolve([]) : listarLideres(),
+        listarFiliais(),
+      ]);
       setColaboradores(cols);
       setLideres(lids);
+      setFiliais(fils);
     } catch {
       setErro("Não foi possível carregar os colaboradores.");
     } finally {
@@ -70,7 +76,7 @@ export function ColaboradoresGestao() {
           </CardHeader>
           {mostrarFormulario && (
             <CardBody>
-              <NovoColaboradorForm liderFixo={liderFixo} lideres={lideres} onCriado={carregar} />
+              <NovoColaboradorForm liderFixo={liderFixo} lideres={lideres} filiais={filiais} onCriado={carregar} />
             </CardBody>
           )}
         </Card>

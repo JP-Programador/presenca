@@ -27,10 +27,12 @@ const ColaboradoresGestao = lazy(() =>
 
 // Hierarquia: admin > coordenador > gestor > colaborador, com auditor no
 // mesmo nível de LEITURA do admin (mas sem nenhuma escrita).
-// - Visão global (mapa/ranking/log): admin, auditor e coordenador.
+// - Coordenação (mapa/ranking/SLA): admin, auditor e coordenador.
+// - Auditoria (trilha sensível): exclusiva de admin e auditor — coordenador NÃO acessa.
 // - Gestão de usuários (líderes+): admin cria qualquer papel; coordenador só cria líderes.
 // - Gestão de colaboradores: líder (só os seus), coordenador e admin.
 const PAPEIS_VISAO_GLOBAL = ["admin", "auditor", "coordenador"] as const;
+const PAPEIS_AUDITORIA = ["admin", "auditor"] as const;
 const PAPEIS_GESTAO_USUARIOS = ["admin", "coordenador"] as const;
 const PAPEIS_GESTAO_COLABORADORES = ["admin", "coordenador", "gestor"] as const;
 
@@ -69,7 +71,7 @@ export function AppRoutes() {
       <Route
         path="/auditoria"
         element={
-          <RequireRole roles={[...PAPEIS_VISAO_GLOBAL]}>
+          <RequireRole roles={[...PAPEIS_AUDITORIA]} fallback="/coordenador">
             <Suspense fallback={<LoadingScreen />}>
               <AuditoriaDashboard />
             </Suspense>

@@ -3,14 +3,15 @@ import { Button } from "@/components/ui/Button";
 import type { PerfilAcesso } from "@/types/domain";
 
 const VISAO_GLOBAL: PerfilAcesso[] = ["admin", "auditor", "coordenador"];
+const AUDITORIA: PerfilAcesso[] = ["admin", "auditor"];
 const GESTAO_USUARIOS: PerfilAcesso[] = ["admin", "coordenador"];
 const GESTAO_COLABORADORES: PerfilAcesso[] = ["admin", "coordenador", "gestor"];
 
 /**
  * Links de navegação entre os painéis administrativos + botão sair,
- * mostrados conforme a hierarquia: coordenação/auditoria para quem tem
- * visão global (admin, auditor, coordenador); usuários para admin/coordenador;
- * colaboradores para gestor/coordenador/admin.
+ * mostrados conforme a hierarquia: coordenação para quem tem visão global
+ * (admin, auditor, coordenador); auditoria exclusiva de admin/auditor;
+ * usuários para admin/coordenador; colaboradores para gestor/coordenador/admin.
  */
 export function NavPaineis({
   perfil,
@@ -24,13 +25,13 @@ export function NavPaineis({
   const temVisaoGlobal = VISAO_GLOBAL.includes(perfil);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
       {atual !== "coordenador" && temVisaoGlobal && (
         <Link to="/coordenador" className="text-sm font-semibold text-primary hover:underline">
           Coordenação
         </Link>
       )}
-      {atual !== "auditoria" && temVisaoGlobal && (
+      {atual !== "auditoria" && AUDITORIA.includes(perfil) && (
         <Link to="/auditoria" className="text-sm font-semibold text-primary hover:underline">
           Auditoria
         </Link>

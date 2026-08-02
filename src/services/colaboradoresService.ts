@@ -24,23 +24,11 @@ export interface NovoColaboradorInput {
   matricula: string;
   cargo: string;
   liderId: string;
+  filialId: string;
 }
 
-/**
- * Cria um colaborador (sem login próprio). filial_id é herdado automaticamente
- * da filial "home" do líder direto escolhido — o formulário não pede filial.
- */
+/** Cria um colaborador (sem login próprio) na filial escolhida no formulário. */
 export async function criarColaborador(input: NovoColaboradorInput): Promise<Colaborador> {
-  const { data: lider, error: erroLider } = await supabase
-    .from("perfis")
-    .select("filial_id")
-    .eq("id", input.liderId)
-    .single();
-  if (erroLider) throw erroLider;
-  if (!lider.filial_id) {
-    throw new Error("O líder selecionado não tem uma filial de origem definida — ajuste isso em Usuários antes de continuar.");
-  }
-
   const { data, error } = await supabase
     .from("colaboradores")
     .insert({
@@ -48,7 +36,7 @@ export async function criarColaborador(input: NovoColaboradorInput): Promise<Col
       matricula: input.matricula,
       cargo: input.cargo,
       lider_id: input.liderId,
-      filial_id: lider.filial_id,
+      filial_id: input.filialId,
     })
     .select(SELECT_COLUNAS)
     .single();
