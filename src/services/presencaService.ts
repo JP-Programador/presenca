@@ -26,7 +26,7 @@ export async function listarJustificativasPendentes(): Promise<Justificativa[]> 
   const { data, error } = await supabase
     .from("justificativas")
     .select(
-      "id, registro_id, colaborador_id, data_referencia, motivo, anexo_path, status, created_at, colaboradores(nome), colaboradores!inner(filial_id, filiais(nome))"
+      "id, registro_id, colaborador_id, data_referencia, motivo, anexo_path, status, created_at, colaboradores!inner(nome, filial_id, filiais(nome))"
     )
     .eq("status", "pendente")
     .order("created_at", { ascending: false });
