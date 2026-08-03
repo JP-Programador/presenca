@@ -51,7 +51,7 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
         nome,
         email,
         perfil,
-        filial_id: filialId || null,
+        filial_id: perfil === "coordenador" || perfil === "gestor" ? null : filialId || null,
         filiais_gerenciadas: perfil === "gestor" ? filiaisGerenciadas : undefined,
         coordenador_id: perfil === "gestor" && !criadorEhCoordenador ? coordenadorId || null : undefined,
       });
@@ -116,21 +116,23 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
           </p>
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-ink dark:text-white">Filial de origem</label>
-          <select
-            value={filialId}
-            onChange={(e) => setFilialId(e.target.value)}
-            className="h-11 rounded-md border border-ink/20 bg-white px-3 text-sm text-ink dark:border-white/20 dark:bg-[#242424] dark:text-white"
-          >
-            <option value="">Nenhuma / todas (admin, coordenador)</option>
-            {filiais.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.nome}
-              </option>
-            ))}
-          </select>
-        </div>
+        {perfil !== "coordenador" && perfil !== "gestor" && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-ink dark:text-white">Filial de origem</label>
+            <select
+              value={filialId}
+              onChange={(e) => setFilialId(e.target.value)}
+              className="h-11 rounded-md border border-ink/20 bg-white px-3 text-sm text-ink dark:border-white/20 dark:bg-[#242424] dark:text-white"
+            >
+              <option value="">Nenhuma / todas (admin, coordenador)</option>
+              {filiais.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {perfil === "gestor" && !criadorEhCoordenador && (

@@ -1,22 +1,25 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { OutrosStatusModal } from "@/components/presenca/OutrosStatusModal";
-import type { MotivoOutros, StatusDia } from "@/types/status";
+import { ConfirmarStatusModal } from "@/components/presenca/ConfirmarStatusModal";
+import { STATUS_DIA_LABEL, type MotivoOutros, type StatusDia } from "@/types/status";
 
 type StatusManual = Extract<StatusDia, "PRESENTE" | "FALTA" | "ATESTADO" | "FOLGA" | "OUTROS">;
 
-const ACOES_MANUAIS: { status: StatusManual; label: string; variant: "primary" | "secondary" | "danger" }[] = [
-  { status: "PRESENTE", label: "Presente", variant: "primary" },
-  { status: "FALTA", label: "Falta", variant: "danger" },
-  { status: "ATESTADO", label: "Atestado", variant: "secondary" },
-  { status: "FOLGA", label: "Folga", variant: "secondary" },
-  { status: "OUTROS", label: "Outros", variant: "secondary" },
+const ACOES_MANUAIS: { status: StatusManual; label: string }[] = [
+  { status: "PRESENTE", label: "Presente" },
+  { status: "FALTA", label: "Falta" },
+  { status: "ATESTADO", label: "Atestado" },
+  { status: "FOLGA", label: "Folga" },
+  { status: "OUTROS", label: "Outros" },
 ];
 
 interface StatusActionMenuProps {
   nome: string;
   statusAtual: StatusDia;
   desabilitado?: boolean;
+  /** Exige confirmação num modal antes de aplicar a mudança de status manual (usado na coordenação). */
+  pedirConfirmacao?: boolean;
   onAprovar: () => Promise<void>;
   onRejeitar: () => Promise<void>;
   onMarcarManual: (status: StatusManual, opts?: { motivoOutros?: MotivoOutros; observacao?: string }) => Promise<void>;
@@ -27,12 +30,14 @@ export function StatusActionMenu({
   nome,
   statusAtual,
   desabilitado,
+  pedirConfirmacao,
   onAprovar,
   onRejeitar,
   onMarcarManual,
 }: StatusActionMenuProps) {
   const [processando, setProcessando] = useState<string | null>(null);
   const [modalOutrosAberto, setModalOutrosAberto] = useState(false);
+  const [confirmacaoPendente, setConfirmacaoPendente] = useState<StatusManual | null>(null);
 
   async function executar(chave: string, acao: () => Promise<void>) {
     setProcessando(chave);
@@ -72,25 +77,42 @@ export function StatusActionMenu({
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        {ACOES_MANUAIS.filter((a) => a.status !== statusAtual).map((a) => (
-          <Button
-            key={a.status}
-            variant={a.variant}
-            size="md"
-            disabled={desabilitado || processando !== null}
-            loading={processando === a.status}
-            onClick={() => {
-              if (a.status === "OUTROS") {
-                setModalOutrosAberto(true);
-                return;
-              }
-              executar(a.status, () => onMarcarManual(a.status));
-            }}
-          >
-            {a.label}
-          </Button>
-        ))}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-ink/40 dark:text-white/40">
+            Status atual:
+          </span>
+          <span className="rounded-full bg-ink px-2.5 py-1 text-xs font-bold text-white dark:bg-white dark:text-ink">
+            {STATUS_DIA_LABEL[statusAtual]}
+          </span>
+        </div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink/40 dark:text-white/40">
+          Mudar status:
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {ACOES_MANUAIS.filter((a) => a.status !== statusAtual).map((a) => (
+            <Button
+              key={a.status}
+              variant="secondary"
+              size="md"
+              disabled={desabilitado || processando !== null}
+              loading={processando === a.status}
+              onClick={() => {
+                if (a.status === "OUTROS") {
+                  setModalOutrosAberto(true);
+                  return;
+                }
+                if (pedirConfirmacao) {
+                  setConfirmacaoPendente(a.status);
+                  return;
+                }
+                executar(a.status, () => onMarcarManual(a.status));
+              }}
+            >
+              {a.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {modalOutrosAberto && (
@@ -99,6 +121,19 @@ export function StatusActionMenu({
           onFechar={() => setModalOutrosAberto(false)}
           onConfirmar={async (motivo, observacao) => {
             await executar("OUTROS", () => onMarcarManual("OUTROS", { motivoOutros: motivo, observacao }));
+          }}
+        />
+      )}
+
+      {confirmacaoPendente && (
+        <ConfirmarStatusModal
+          nome={nome}
+          novoStatus={STATUS_DIA_LABEL[confirmacaoPendente]}
+          onCancelar={() => setConfirmacaoPendente(null)}
+          onConfirmar={async () => {
+            const status = confirmacaoPendente;
+            setConfirmacaoPendente(null);
+            await executar(status, () => onMarcarManual(status));
           }}
         />
       )}

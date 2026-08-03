@@ -6,6 +6,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { NovoColaboradorForm } from "@/components/presenca/NovoColaboradorForm";
+import { ImportarColaboradoresForm } from "@/components/presenca/ImportarColaboradoresForm";
+import { TrocarLiderColaborador } from "@/components/presenca/TrocarLiderColaborador";
 import { useAuth } from "@/providers/AuthProvider";
 import { listarFiliais, listarLideres } from "@/services/coordenacaoService";
 import type { PessoaSimples } from "@/services/coordenacaoService";
@@ -81,6 +83,16 @@ export function ColaboradoresGestao() {
           )}
         </Card>
 
+        <Card className="mb-6">
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Importar em lote</h2>
+            <p className="text-xs text-ink/50 dark:text-white/50">Cadastre vários colaboradores de uma vez via planilha.</p>
+          </CardHeader>
+          <CardBody>
+            <ImportarColaboradoresForm liderFixo={liderFixo} lideres={lideres} filiais={filiais} onImportado={carregar} />
+          </CardBody>
+        </Card>
+
         <Card>
           <CardHeader>
             <h2 className="text-sm font-semibold text-ink dark:text-white">
@@ -97,7 +109,7 @@ export function ColaboradoresGestao() {
             ) : (
               <ul className="divide-y divide-ink/5 dark:divide-white/5">
                 {colaboradores.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 py-3">
+                  <li key={c.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-ink dark:text-white">
                         {c.nome}
@@ -112,6 +124,14 @@ export function ColaboradoresGestao() {
                         {!ehLider && c.lider_nome ? ` · Líder: ${c.lider_nome}` : ""}
                       </p>
                     </div>
+                    {!ehLider && (
+                      <TrocarLiderColaborador
+                        colaboradorId={c.id}
+                        liderAtualId={c.lider_id}
+                        lideres={lideres}
+                        onAtualizado={carregar}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
