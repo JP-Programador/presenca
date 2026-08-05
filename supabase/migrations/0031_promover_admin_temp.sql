@@ -1,8 +1,11 @@
 -- =========================================================
--- 0031 · Promove EMAIL_REDIGIDO a admin
--- (senha do admin original foi esquecida)
+-- 0031 · Promove um usuário a admin (correção pontual de acesso)
+--
+-- Correção aplicada manualmente em produção para um e-mail específico,
+-- via painel/SQL editor do Supabase — não versionada com o e-mail real
+-- para evitar expor PII no histórico do repositório.
 -- =========================================================
 
-update tlp_presenca.perfis
-set perfil = 'admin'
-where email = 'EMAIL_REDIGIDO';
+-- update tlp_presenca.perfis
+-- set perfil = 'admin'
+-- where email = '<email-do-usuario>';

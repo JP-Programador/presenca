@@ -7,6 +7,7 @@
 // se as 4 já tiverem sido feitas ou se a ordem for violada.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { dentroDoLimite, extrairIp } from "../_shared/rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -68,6 +69,14 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     db: { schema: "tlp_presenca" },
   });
+
+  const ip = extrairIp(req);
+  if (!(await dentroDoLimite(supabase, "marcacao-publica", ip, 10, 300))) {
+    return json(
+      { error: "muitas_tentativas", mensagem: "Muitas tentativas. Aguarde alguns minutos e tente novamente." },
+      429
+    );
+  }
 
   const { data: filial, error: filialError } = await supabase
     .from("filiais")
@@ -166,7 +175,10 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (insertError) {
-    await supabase.storage.from(BUCKET).remove([fotoPath]);
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove([fotoPath]);
+    if (removeError) {
+      console.error(`falha ao remover foto órfã ${fotoPath}:`, removeError.message);
+    }
     return json({ error: "falha_gravar_registro", mensagem: insertError.message }, 500);
   }
 

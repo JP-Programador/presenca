@@ -29,6 +29,7 @@ export function TecnicoCheckin() {
   const camera = useCamera();
   const geo = useGeolocation();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const validacaoAtualRef = useRef(0);
 
   // Validação ao vivo: assim que filial + 4 dígitos estão preenchidos, confirma
   // no servidor (debounced) se existe colaborador ativo com esses dados.
@@ -36,14 +37,18 @@ export function TecnicoCheckin() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (codigoFilial.trim().length === 0 || matricula4.length !== 4) {
+      validacaoAtualRef.current += 1;
       setStatusValidacao("vazio");
       setNomeEncontrado(null);
       return;
     }
 
     setStatusValidacao("verificando");
+    const idDestaValidacao = ++validacaoAtualRef.current;
     debounceRef.current = setTimeout(async () => {
       const resposta = await validarColaborador(codigoFilial.trim(), matricula4);
+      // Descarta se uma digitação mais recente já disparou outra validação.
+      if (idDestaValidacao !== validacaoAtualRef.current) return;
       if (resposta.encontrado) {
         setStatusValidacao("encontrado");
         setNomeEncontrado(resposta.nome ?? null);
@@ -69,31 +74,33 @@ export function TecnicoCheckin() {
     setEnviando(true);
     setErroEnvio(null);
 
-    const resposta = await enviarCheckin({
-      codigoFilial: codigoFilial.trim(),
-      matricula4,
-      tipo: "entrada",
-      fotoDataUrl: camera.fotoDataUrl,
-      latitude: geo.coords.latitude,
-      longitude: geo.coords.longitude,
-      precisao: geo.coords.precisao,
-    });
+    try {
+      const resposta = await enviarCheckin({
+        codigoFilial: codigoFilial.trim(),
+        matricula4,
+        tipo: "entrada",
+        fotoDataUrl: camera.fotoDataUrl,
+        latitude: geo.coords.latitude,
+        longitude: geo.coords.longitude,
+        precisao: geo.coords.precisao,
+      });
 
-    setEnviando(false);
+      if (!resposta.ok) {
+        setErroEnvio(resposta.mensagem);
+        return;
+      }
 
-    if (!resposta.ok) {
-      setErroEnvio(resposta.mensagem);
-      return;
+      setResultado({
+        nome: resposta.colaborador_nome,
+        status: resposta.status,
+        horario: new Date(resposta.horario_registrado).toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+    } finally {
+      setEnviando(false);
     }
-
-    setResultado({
-      nome: resposta.colaborador_nome,
-      status: resposta.status,
-      horario: new Date(resposta.horario_registrado).toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    });
   }
 
   function registrarNovamente() {

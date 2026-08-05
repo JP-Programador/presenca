@@ -9,7 +9,7 @@ import { definirNovaSenha } from "@/services/authService";
 
 /**
  * Bloqueia o acesso ao resto do sistema até o usuário trocar a senha
- * inicial fixa ("Mudar@123", ver Edge Function admin-criar-usuario) por
+ * inicial gerada aleatoriamente (ver Edge Function admin-criar-usuario) por
  * uma própria. Renderizada pelos guards de rota (RequireAuth/RequireRole)
  * no lugar da tela pedida, enquanto perfis.senha_temporaria = true.
  */
@@ -20,7 +20,7 @@ export function TrocarSenhaObrigatoria() {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const senhaValida = novaSenha.length >= 8 && novaSenha !== "Mudar@123";
+  const senhaValida = novaSenha.length >= 8;
   const podeEnviar = senhaValida && novaSenha === confirmacao;
 
   async function onSubmit(e: FormEvent) {

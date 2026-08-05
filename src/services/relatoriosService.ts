@@ -44,7 +44,7 @@ export async function listarRelatorioPorCoordenador(
     listarRelatorioPresenca(filtro),
     supabase.from("perfis").select("id").in("perfil", ["coordenador", "admin"]),
   ]);
-  const idsCoordenadores = new Set((coordenadores ?? []).map((p: any) => p.id as string));
+  const idsCoordenadores = new Set((coordenadores ?? []).map((p: { id: string }) => p.id));
   return todas.filter((l) => l.aprovado_por && idsCoordenadores.has(l.aprovado_por));
 }
 
@@ -65,7 +65,12 @@ export async function listarRejeicoes(inicioISO: string, fimISO: string): Promis
 
   if (error) throw error;
 
-  return (data ?? [])
-    .filter((row: any) => row.detalhes?.para === "FALTA" || row.detalhes?.para === "FOLGA")
-    .map((row: any) => ({ ...row, ator_nome: row.perfis?.nome ?? "Sistema" }));
+  type LinhaBruta = Omit<AuditLogEntry, "ator_nome" | "detalhes"> & {
+    detalhes: { de?: string; para?: string } & Record<string, unknown>;
+    perfis: { nome: string } | null;
+  };
+
+  return ((data ?? []) as unknown as LinhaBruta[])
+    .filter((row) => row.detalhes?.para === "FALTA" || row.detalhes?.para === "FOLGA")
+    .map((row) => ({ ...row, ator_nome: row.perfis?.nome ?? "Sistema" }));
 }

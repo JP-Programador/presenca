@@ -5,7 +5,17 @@ import type { StatusDiaRegistro } from "@/types/status";
 const SELECT_COLUNAS =
   "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores(nome, matricula), filiais(nome), registros_presenca(foto_path)";
 
-function mapearLinha(row: any): StatusDiaRegistro {
+interface StatusDiaRowBruta
+  extends Omit<
+    StatusDiaRegistro,
+    "colaborador_nome" | "colaborador_matricula" | "filial_nome" | "decidido_por_nome" | "foto_path"
+  > {
+  colaboradores: { nome: string; matricula: string } | null;
+  filiais: { nome: string } | null;
+  registros_presenca: { foto_path: string | null } | null;
+}
+
+function mapearLinha(row: StatusDiaRowBruta): StatusDiaRegistro {
   return {
     ...row,
     colaborador_nome: row.colaboradores?.nome,
@@ -28,7 +38,10 @@ export async function buscarStatusDia(
     .maybeSingle();
 
   if (error) throw error;
-  return data ? mapearLinha(data) : null;
+  // O cliente Supabase não infere o tipo do join a partir da string do select
+  // (database.types.ts é um placeholder sem Relationships reais); o formato
+  // da linha é garantido pela query acima.
+  return data ? mapearLinha(data as unknown as StatusDiaRowBruta) : null;
 }
 
 /** Garante que a linha do dia existe (cria FALTA/FOLGA se necessário) e a retorna. */
@@ -54,7 +67,7 @@ export async function listarStatusDia(
 
   const { data, error } = await query.order("status", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(mapearLinha);
+  return ((data ?? []) as unknown as StatusDiaRowBruta[]).map(mapearLinha);
 }
 
 /**

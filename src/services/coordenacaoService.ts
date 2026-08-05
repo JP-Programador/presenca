@@ -18,7 +18,15 @@ export async function listarRegistrosParaMapa(horas = 24): Promise<RegistroPrese
 
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
+  type LinhaBruta = Omit<RegistroPresenca, "colaborador_nome" | "filial_nome" | "colaborador_matricula"> & {
+    colaboradores: { nome: string } | null;
+    filiais: { nome: string } | null;
+  };
+
+  // O cliente Supabase não infere o tipo do join a partir da string do select
+  // (database.types.ts é um placeholder sem Relationships reais); o formato
+  // da linha é garantido pela query acima.
+  return ((data ?? []) as unknown as LinhaBruta[]).map((row) => ({
     ...row,
     colaborador_nome: row.colaboradores?.nome,
     filial_nome: row.filiais?.nome,
@@ -57,7 +65,9 @@ export async function listarAuditoria(filtro: FiltroAuditoria = {}): Promise<Aud
   const { data, error } = await query;
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
+  type LinhaBruta = Omit<AuditLogEntry, "ator_nome"> & { perfis: { nome: string } | null };
+
+  return ((data ?? []) as unknown as LinhaBruta[]).map((row) => ({
     ...row,
     ator_nome: row.perfis?.nome ?? "Sistema",
   }));
@@ -81,7 +91,20 @@ export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
 
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
+  interface LinhaBruta {
+    id: string;
+    nome: string;
+    email: string;
+    perfil: UsuarioComHierarquia["perfil"];
+    filial_id: string | null;
+    ativo: boolean;
+    coordenador_id: string | null;
+    filiais: { nome: string } | null;
+    coordenador: { nome: string } | null;
+    gestor_filiais: { filiais: { id: string; nome: string } }[] | null;
+  }
+
+  return ((data ?? []) as unknown as LinhaBruta[]).map((row) => ({
     id: row.id,
     nome: row.nome,
     email: row.email,
@@ -91,7 +114,7 @@ export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
     coordenador_id: row.coordenador_id,
     filial_home_nome: row.filiais?.nome ?? null,
     coordenador_nome: row.coordenador?.nome ?? null,
-    filiais_gerenciadas: (row.gestor_filiais ?? []).map((gf: any) => ({
+    filiais_gerenciadas: (row.gestor_filiais ?? []).map((gf) => ({
       id: gf.filiais.id,
       nome: gf.filiais.nome,
     })),
@@ -170,5 +193,5 @@ export async function criarUsuario(input: NovoUsuarioInput) {
   const { data, error } = await supabase.functions.invoke("admin-criar-usuario", { body: input });
   if (error) throw error;
   if (data?.error) throw new Error(data.mensagem ?? "Não foi possível criar o usuário.");
-  return data as { ok: true; usuario_id: string };
+  return data as { ok: true; usuario_id: string; senha_inicial: string };
 }

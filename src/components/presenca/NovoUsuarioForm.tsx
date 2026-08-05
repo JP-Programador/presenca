@@ -14,8 +14,6 @@ const PAPEIS: { valor: PerfilAcesso; label: string }[] = [
   { valor: "admin", label: "Administrador" },
 ];
 
-const SENHA_INICIAL = "Mudar@123";
-
 interface NovoUsuarioFormProps {
   filiais: Filial[];
   coordenadores: PessoaSimples[];
@@ -35,7 +33,7 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
   const [coordenadorId, setCoordenadorId] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [sucesso, setSucesso] = useState(false);
+  const [senhaGerada, setSenhaGerada] = useState<string | null>(null);
 
   function alternarFilialGerenciada(id: string) {
     setFiliaisGerenciadas((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
@@ -45,9 +43,9 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
     e.preventDefault();
     setEnviando(true);
     setErro(null);
-    setSucesso(false);
+    setSenhaGerada(null);
     try {
-      await criarUsuario({
+      const resultado = await criarUsuario({
         nome,
         email,
         perfil,
@@ -55,7 +53,7 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
         filiais_gerenciadas: perfil === "gestor" ? filiaisGerenciadas : undefined,
         coordenador_id: perfil === "gestor" && !criadorEhCoordenador ? coordenadorId || null : undefined,
       });
-      setSucesso(true);
+      setSenhaGerada(resultado.senha_inicial);
       setNome("");
       setEmail("");
       setPerfil(criadorEhCoordenador ? "gestor" : "colaborador");
@@ -73,10 +71,10 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {erro && <Alert variant="danger">{erro}</Alert>}
-      {sucesso && (
+      {senhaGerada && (
         <Alert variant="success" title="Usuário criado">
-          Senha inicial: <strong>{SENHA_INICIAL}</strong> — passe para a pessoa por fora (WhatsApp, verbal
-          etc.). O sistema vai obrigar a troca dessa senha no primeiro acesso.
+          Senha inicial: <strong>{senhaGerada}</strong> — passe para a pessoa por fora (WhatsApp, verbal etc.)
+          agora, ela não será mostrada novamente. O sistema vai obrigar a troca dessa senha no primeiro acesso.
         </Alert>
       )}
 

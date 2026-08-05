@@ -6,6 +6,7 @@
 // líder" antes dele tentar capturar foto à toa.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { dentroDoLimite, extrairIp } from "../_shared/rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -42,6 +43,12 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     db: { schema: "tlp_presenca" },
   });
+
+  const ip = extrairIp(req);
+  // Limite mais alto: essa função é chamada a cada dígito digitado (debounced).
+  if (!(await dentroDoLimite(supabase, "validar-colaborador", ip, 30, 300))) {
+    return json({ encontrado: false }, 200);
+  }
 
   const { data: filial } = await supabase.from("filiais").select("id").eq("codigo", codigo_filial).maybeSingle();
   if (!filial) return json({ encontrado: false }, 200);
