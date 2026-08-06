@@ -22,6 +22,7 @@ export function LiderDashboard() {
   const [pontosMapa, setPontosMapa] = useState<PontoMapaOperacional[]>([]);
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [buscaNome, setBuscaNome] = useState("");
 
   async function carregar() {
     setCarregandoLista(true);
@@ -102,13 +103,15 @@ export function LiderDashboard() {
           <div className="flex flex-col gap-3">
             {aba === "status_dia" && (
               <div className="mb-4">
-                <MiniMapCard titulo="Mapa da filial (hoje)" pontos={pontosMapa} />
+                <MiniMapCard titulo="Mapa da filial (hoje)" pontos={pontosMapa} filtroNome={buscaNome} />
               </div>
             )}
 
             {aba === "status_dia" && (
               <PendenciasPainel
                 itens={statusDoDia}
+                busca={buscaNome}
+                onBuscaChange={setBuscaNome}
                 renderAcoes={
                   ehAuditor
                     ? undefined

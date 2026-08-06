@@ -31,6 +31,7 @@ export function CoordenadorDashboard() {
   const [decisoesSla, setDecisoesSla] = useState<SlaStatusDia[]>([]);
   const [carregandoDados, setCarregandoDados] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [buscaNome, setBuscaNome] = useState("");
 
   async function carregar() {
     setCarregandoDados(true);
@@ -141,11 +142,16 @@ export function CoordenadorDashboard() {
           <CardHeader>
             <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa operacional (hoje)</h2>
             <p className="text-xs text-ink/50 dark:text-white/50">
-              Status do dia de cada colaborador, com localização quando disponível.
+              Status do dia de cada colaborador, com localização quando disponível. A busca por nome é a mesma do
+              painel de pendências, mais abaixo.
             </p>
           </CardHeader>
           <CardBody>
-            {carregandoDados ? <MapaCarregando /> : <PresenceMap pontos={pontosMapa} />}
+            {carregandoDados ? (
+              <MapaCarregando />
+            ) : (
+              <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} />
+            )}
           </CardBody>
         </Card>
 
@@ -174,6 +180,8 @@ export function CoordenadorDashboard() {
             ) : (
               <PendenciasPainel
                 itens={statusDoDia}
+                busca={buscaNome}
+                onBuscaChange={setBuscaNome}
                 renderAcoes={
                   ehAuditor
                     ? undefined

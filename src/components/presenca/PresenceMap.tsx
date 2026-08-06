@@ -20,14 +20,18 @@ interface PresenceMapProps {
   somenteExibicao?: boolean;
   /** Altura do mapa em px (padrão 420 — o MiniMapCard usa um valor menor). */
   altura?: number;
+  /** Controla o filtro por nome de fora (ex.: sincronizado com a busca do painel de pendências) — esconde o campo de busca próprio. */
+  filtroNomeExterno?: string;
 }
 
 /** Mapa operacional completo (Módulo 9): presentes/pendentes/faltas/atestados/folgas, com filtro por filial e líder. */
-export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceMapProps) {
+export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeExterno }: PresenceMapProps) {
   const [lideresPorFilial, setLideresPorFilial] = useState<LiderFilial[]>([]);
   const [filialFiltro, setFilialFiltro] = useState("");
   const [liderFiltro, setLiderFiltro] = useState("");
-  const [nomeFiltro, setNomeFiltro] = useState("");
+  const [nomeFiltroInterno, setNomeFiltroInterno] = useState("");
+  const nomeFiltroControlado = filtroNomeExterno !== undefined;
+  const nomeFiltro = nomeFiltroControlado ? filtroNomeExterno : nomeFiltroInterno;
 
   useEffect(() => {
     if (somenteExibicao) return;
@@ -54,7 +58,7 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceM
   }, [lideresPorFilial, liderFiltro]);
 
   const filtrados = useMemo(() => {
-    const termo = nomeFiltro.trim().toLowerCase();
+    const termo = (nomeFiltro ?? "").trim().toLowerCase();
     return pontos.filter((p) => {
       if (filialFiltro && p.filial_id !== filialFiltro) return false;
       if (filialIdsDoLider && !filialIdsDoLider.has(p.filial_id)) return false;
@@ -74,12 +78,14 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceM
     <div className="flex flex-col gap-3">
       {!somenteExibicao && (
         <div className="flex flex-wrap gap-2">
-          <input
-            value={nomeFiltro}
-            onChange={(e) => setNomeFiltro(e.target.value)}
-            placeholder="Buscar colaborador..."
-            className="h-10 flex-1 min-w-[160px] rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
-          />
+          {!nomeFiltroControlado && (
+            <input
+              value={nomeFiltroInterno}
+              onChange={(e) => setNomeFiltroInterno(e.target.value)}
+              placeholder="Buscar colaborador..."
+              className="h-10 flex-1 min-w-[160px] rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+            />
+          )}
           <select
             value={filialFiltro}
             onChange={(e) => setFilialFiltro(e.target.value)}

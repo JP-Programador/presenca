@@ -107,6 +107,9 @@ interface PendenciasPainelProps {
   itens: StatusDiaRegistro[];
   /** Renderizado à direita de cada linha (ex.: StatusActionMenu no líder). Omitir = somente leitura. */
   renderAcoes?: (item: StatusDiaRegistro) => React.ReactNode;
+  /** Controla a busca por nome de fora (ex.: pra também filtrar o mapa acima). Omitir = busca só interna, como antes. */
+  busca?: string;
+  onBuscaChange?: (busca: string) => void;
 }
 
 /**
@@ -116,9 +119,11 @@ interface PendenciasPainelProps {
  * cor quando o filtro correspondente está selecionado — do contrário fica
  * neutro, igual aos outros, para reduzir a poluição visual.
  */
-export function PendenciasPainel({ itens, renderAcoes }: PendenciasPainelProps) {
+export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, onBuscaChange }: PendenciasPainelProps) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
-  const [busca, setBusca] = useState("");
+  const [buscaInterna, setBuscaInterna] = useState("");
+  const busca = buscaControlada ?? buscaInterna;
+  const setBusca = onBuscaChange ?? setBuscaInterna;
   const destacarFaltas = useMemo(apos9hEmDiaUtil, []);
 
   const contagens = useMemo(() => {

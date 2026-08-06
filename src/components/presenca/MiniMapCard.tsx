@@ -6,15 +6,22 @@ interface MiniMapCardProps {
   titulo: string;
   pontos: PontoMapaOperacional[];
   carregando?: boolean;
+  /** Filtra os pontos exibidos no mapa por nome (ex.: sincronizado com a busca do painel de pendências). */
+  filtroNome?: string;
 }
 
 const ORDEM_RESUMO: StatusDia[] = ["PRESENTE", "PENDENTE", "FALTA", "ATESTADO", "FOLGA", "OUTROS"];
 
 /** Card compacto com o mapa operacional + resumo por status — usado em dashboards menores (líder). */
-export function MiniMapCard({ titulo, pontos, carregando }: MiniMapCardProps) {
+export function MiniMapCard({ titulo, pontos, carregando, filtroNome }: MiniMapCardProps) {
+  const termo = filtroNome?.trim().toLowerCase();
+  const pontosFiltrados = termo
+    ? pontos.filter((p) => p.colaborador_nome?.toLowerCase().includes(termo))
+    : pontos;
+
   const resumo = ORDEM_RESUMO.map((status) => ({
     status,
-    total: pontos.filter((p) => p.status === status).length,
+    total: pontosFiltrados.filter((p) => p.status === status).length,
   })).filter((r) => r.total > 0);
 
   return (
@@ -35,7 +42,7 @@ export function MiniMapCard({ titulo, pontos, carregando }: MiniMapCardProps) {
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          <PresenceMap pontos={pontos} somenteExibicao altura={200} />
+          <PresenceMap pontos={pontosFiltrados} somenteExibicao altura={200} />
         )}
       </CardBody>
     </Card>
