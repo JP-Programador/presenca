@@ -85,7 +85,7 @@ export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
   const { data, error } = await supabase
     .from("perfis")
     .select(
-      "id, nome, email, perfil, filial_id, ativo, coordenador_id, filiais(nome), gestor_filiais(filial_id, filiais(id, nome)), coordenador:perfis!coordenador_id(nome)"
+      "id, nome, email, perfil, filial_id, ativo, coordenador_id, filiais!filial_id(nome), gestor_filiais(filial_id, filiais!filial_id(id, nome)), coordenador:perfis!coordenador_id(nome)"
     )
     .order("nome");
 
