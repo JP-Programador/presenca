@@ -2,17 +2,9 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Circle, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { listarLideresPorFilial, type LiderFilial } from "@/services/mapaOperacionalService";
-import { STATUS_DIA_HEX, STATUS_DIA_LABEL, type PontoMapaOperacional, type StatusDia } from "@/types/status";
+import { STATUS_DIA_HEX, STATUS_DIA_LABEL, type PontoMapaOperacional } from "@/types/status";
 
 const CENTRO_BRASIL: [number, number] = [-14.235, -51.9253];
-
-const LEGENDA: { status: StatusDia; label: string }[] = [
-  { status: "PRESENTE", label: "Presente" },
-  { status: "PENDENTE", label: "Pendente" },
-  { status: "FALTA", label: "Falta" },
-  { status: "ATESTADO", label: "Atestado" },
-  { status: "FOLGA", label: "Folga" },
-];
 
 interface PresenceMapProps {
   pontos: PontoMapaOperacional[];
@@ -60,6 +52,10 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
   const filtrados = useMemo(() => {
     const termo = (nomeFiltro ?? "").trim().toLowerCase();
     return pontos.filter((p) => {
+      // O mapa só mostra quem está com o dia confirmado como Presente — se o
+      // líder marcou Falta/Atestado/Folga/Outros (mesmo que o colaborador alegue
+      // ter trabalhado), some do mapa, já que o status manual do líder prevalece.
+      if (p.status !== "PRESENTE") return false;
       if (filialFiltro && p.filial_id !== filialFiltro) return false;
       if (filialIdsDoLider && !filialIdsDoLider.has(p.filial_id)) return false;
       if (termo && !p.colaborador_nome?.toLowerCase().includes(termo)) return false;
@@ -162,15 +158,6 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
             </Fragment>
           ))}
         </MapContainer>
-
-        <div className="flex flex-wrap items-center gap-3 border-t border-ink/10 bg-white px-4 py-2 text-xs">
-          {LEGENDA.map((item) => (
-            <span key={item.status} className="flex items-center gap-1.5 text-ink/60">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_DIA_HEX[item.status] }} />
-              {item.label}
-            </span>
-          ))}
-        </div>
       </div>
     </div>
   );
