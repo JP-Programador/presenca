@@ -64,7 +64,6 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceM
   }, [pontos, filialFiltro, filialIdsDoLider, nomeFiltro]);
 
   const comCoordenadas = filtrados.filter((p) => p.latitude != null && p.longitude != null);
-  const faltasSemLocalizacao = filtrados.filter((p) => p.status === "FALTA" && p.latitude == null).length;
 
   const centro: [number, number] =
     comCoordenadas.length > 0
@@ -158,20 +157,13 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420 }: PresenceM
           ))}
         </MapContainer>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 bg-white px-4 py-2 text-xs">
-          <div className="flex flex-wrap gap-3">
-            {LEGENDA.map((item) => (
-              <span key={item.status} className="flex items-center gap-1.5 text-ink/60">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_DIA_HEX[item.status] }} />
-                {item.label}
-              </span>
-            ))}
-          </div>
-          {faltasSemLocalizacao > 0 && (
-            <span className="font-semibold text-danger">
-              {faltasSemLocalizacao} falta{faltasSemLocalizacao > 1 ? "s" : ""} sem localização
+        <div className="flex flex-wrap items-center gap-3 border-t border-ink/10 bg-white px-4 py-2 text-xs">
+          {LEGENDA.map((item) => (
+            <span key={item.status} className="flex items-center gap-1.5 text-ink/60">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_DIA_HEX[item.status] }} />
+              {item.label}
             </span>
-          )}
+          ))}
         </div>
       </div>
     </div>
