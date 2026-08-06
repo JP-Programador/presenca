@@ -21,6 +21,7 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
   const [lideresPorFilial, setLideresPorFilial] = useState<LiderFilial[]>([]);
   const [filialFiltro, setFilialFiltro] = useState("");
   const [liderFiltro, setLiderFiltro] = useState("");
+  const [colaboradorFiltro, setColaboradorFiltro] = useState("");
   const [nomeFiltroInterno, setNomeFiltroInterno] = useState("");
   const nomeFiltroControlado = filtroNomeExterno !== undefined;
   const nomeFiltro = nomeFiltroControlado ? filtroNomeExterno : nomeFiltroInterno;
@@ -49,6 +50,16 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
     return new Set(lideresPorFilial.filter((l) => l.lider_id === liderFiltro).map((l) => l.filial_id));
   }, [lideresPorFilial, liderFiltro]);
 
+  const colaboradores = useMemo(() => {
+    const mapa = new Map<string, string>();
+    pontos
+      .filter((p) => p.status === "PRESENTE")
+      .forEach((p) => mapa.set(p.colaborador_id, p.colaborador_nome));
+    return Array.from(mapa.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [pontos]);
+
   const filtrados = useMemo(() => {
     const termo = (nomeFiltro ?? "").trim().toLowerCase();
     return pontos.filter((p) => {
@@ -58,10 +69,11 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
       if (p.status !== "PRESENTE") return false;
       if (filialFiltro && p.filial_id !== filialFiltro) return false;
       if (filialIdsDoLider && !filialIdsDoLider.has(p.filial_id)) return false;
+      if (colaboradorFiltro && p.colaborador_id !== colaboradorFiltro) return false;
       if (termo && !p.colaborador_nome?.toLowerCase().includes(termo)) return false;
       return true;
     });
-  }, [pontos, filialFiltro, filialIdsDoLider, nomeFiltro]);
+  }, [pontos, filialFiltro, filialIdsDoLider, colaboradorFiltro, nomeFiltro]);
 
   const comCoordenadas = filtrados.filter((p) => p.latitude != null && p.longitude != null);
 
@@ -103,6 +115,18 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
             {lideres.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.nome}
+              </option>
+            ))}
+          </select>
+          <select
+            value={colaboradorFiltro}
+            onChange={(e) => setColaboradorFiltro(e.target.value)}
+            className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+          >
+            <option value="">Todos os colaboradores</option>
+            {colaboradores.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
               </option>
             ))}
           </select>
