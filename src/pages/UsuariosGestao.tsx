@@ -38,8 +38,8 @@ export function UsuariosGestao() {
       setUsuarios(users);
       setFiliais(fils);
       setCoordenadores(coords);
-    } catch (err) {
-      const detalhe = err instanceof Error ? err.message : String(err);
+    } catch (err: any) {
+      const detalhe = err?.message || err?.error_description || err?.hint || err?.details || JSON.stringify(err);
       setErro(`Não foi possível carregar os usuários. (${detalhe})`);
     } finally {
       setCarregandoLista(false);
