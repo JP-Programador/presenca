@@ -32,7 +32,7 @@ const ACAO_LABEL: Record<string, string> = {
   perfil_dados_alterados: "Dados do usuário editados",
   gestor_atribuido_filial: "Gestor atribuído a filial",
   gestor_removido_filial: "Gestor removido de filial",
-  foto_excluida_48h: "Foto excluída automaticamente (48h)",
+  foto_excluida_48h: "Foto excluída automaticamente (24h)",
   login: "Login",
   logout: "Logout",
   senha_redefinida_solicitada: "Redefinição de senha solicitada",

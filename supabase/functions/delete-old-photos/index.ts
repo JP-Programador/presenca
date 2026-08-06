@@ -2,7 +2,7 @@
 //
 // Edge Function chamada pelo pg_cron (a cada 30 min, ver migration 0007).
 // Localiza registros_presenca com foto_path preenchido e foto_expira_em
-// já vencido (horario_registrado + 48h), apaga o arquivo do bucket
+// já vencido (horario_registrado + 24h), apaga o arquivo do bucket
 // 'tlp-fotos-presenca' e limpa a referência no banco, gravando auditoria.
 //
 // Usa a service_role key: roda com privilégios de servidor, ignorando RLS,
