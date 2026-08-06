@@ -11,6 +11,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { hojeISO } from "@/lib/calendario";
 import * as statusDiaService from "@/services/statusDiaService";
 import { listarMapaOperacional } from "@/services/mapaOperacionalService";
+import { contarColaboradoresAtivos } from "@/services/colaboradoresService";
 import type { MotivoOutros, PontoMapaOperacional, StatusDiaRegistro } from "@/types/status";
 
 type Aba = "status_dia" | "geral";
@@ -21,6 +22,7 @@ export function LiderDashboard() {
   const [aba, setAba] = useState<Aba>("status_dia");
   const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);
   const [pontosMapa, setPontosMapa] = useState<PontoMapaOperacional[]>([]);
+  const [escalados, setEscalados] = useState(0);
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [buscaNome, setBuscaNome] = useState("");
@@ -29,12 +31,14 @@ export function LiderDashboard() {
     setCarregandoLista(true);
     setErro(null);
     try {
-      const [statusDia, pontos] = await Promise.all([
+      const [statusDia, pontos, totalEscalados] = await Promise.all([
         statusDiaService.listarStatusDia(hojeISO()),
         listarMapaOperacional(hojeISO()),
+        contarColaboradoresAtivos(),
       ]);
       setStatusDoDia(statusDia);
       setPontosMapa(pontos);
+      setEscalados(totalEscalados);
     } catch (err) {
       setErro("Não foi possível carregar as pendências. Atualize a página.");
     } finally {
@@ -59,12 +63,11 @@ export function LiderDashboard() {
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
     const pendentes = statusDoDia.filter((s) => s.status === "PENDENTE").length;
-    const faltas = statusDoDia.filter((s) => s.status === "FALTA").length;
-    // "Ausentes" = todo mundo que não está presente nem aguardando aprovação
-    // (falta + atestado + folga + outros).
-    const ausentes = statusDoDia.filter((s) => s.status !== "PRESENTE" && s.status !== "PENDENTE").length;
-    return { presentes, pendentes, faltas, ausentes };
-  }, [statusDoDia]);
+    // Ausência não planejada = falta ou atestado, o que exige remanejamento imediato.
+    const faltasAtestados = statusDoDia.filter((s) => s.status === "FALTA" || s.status === "ATESTADO").length;
+    const percentualPresenca = escalados > 0 ? Math.round((presentes / escalados) * 100) : 0;
+    return { presentes, pendentes, faltasAtestados, percentualPresenca };
+  }, [statusDoDia, escalados]);
 
   if (!usuario) return null; // narrowing de tipo; na prática nunca alcançado (ver RequireAuth)
 
@@ -79,11 +82,26 @@ export function LiderDashboard() {
       />
 
       <main className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricCard label="Presentes hoje" valor={String(metricas.presentes)} destaque="primary" />
-          <MetricCard label="Faltas hoje" valor={String(metricas.faltas)} destaque="danger" />
-          <MetricCard label="Ausentes (falta+atestado+folga+outros)" valor={String(metricas.ausentes)} destaque="danger" />
-          <MetricCard label="Pendentes de aprovação" valor={String(metricas.pendentes)} destaque="warning" />
+        <div className="mb-5 grid grid-cols-3 gap-2">
+          <MetricCard
+            label="Disponibilidade"
+            valor={`${metricas.percentualPresenca}%`}
+            subtitulo={`${metricas.presentes}/${escalados} presentes`}
+            tooltip="Presentes hoje sobre o total de colaboradores ativos do seu time."
+            destaque="primary"
+          />
+          <MetricCard
+            label="Faltas/Atestados"
+            valor={String(metricas.faltasAtestados)}
+            tooltip="Ausências não planejadas (falta ou atestado) — exigem remanejamento imediato."
+            destaque="danger"
+          />
+          <MetricCard
+            label="Pendentes"
+            valor={String(metricas.pendentes)}
+            tooltip="Check-ins aguardando sua aprovação."
+            destaque="warning"
+          />
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-2 rounded-md bg-white p-1 shadow-sm dark:bg-[#242424] sm:flex">

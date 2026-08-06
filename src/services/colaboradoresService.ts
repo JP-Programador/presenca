@@ -27,6 +27,16 @@ export async function listarColaboradores(): Promise<Colaborador[]> {
   return ((data ?? []) as unknown as ColaboradorRowBruta[]).map(mapearLinha);
 }
 
+/** Total de colaboradores ativos visíveis pelo usuário atual (efetivo escalado do dia) — mesma RLS de listarColaboradores. */
+export async function contarColaboradoresAtivos(): Promise<number> {
+  const { count, error } = await supabase
+    .from("colaboradores")
+    .select("id", { count: "exact", head: true })
+    .eq("ativo", true);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export interface NovoColaboradorInput {
   nome: string;
   matricula: string;

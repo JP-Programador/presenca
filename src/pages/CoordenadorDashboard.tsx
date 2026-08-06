@@ -17,6 +17,7 @@ import { hojeISO } from "@/lib/calendario";
 import { listarRankingLideres } from "@/services/coordenacaoService";
 import * as statusDiaService from "@/services/statusDiaService";
 import { listarMapaOperacional } from "@/services/mapaOperacionalService";
+import { contarColaboradoresAtivos } from "@/services/colaboradoresService";
 import { listarSlaStatusDia, mediaDiaria, mediaMensal, ranquearPorLider } from "@/services/slaService";
 import type { SlaLider } from "@/types/domain";
 import type { MotivoOutros, PontoMapaOperacional, SlaStatusDia, StatusDiaRegistro } from "@/types/status";
@@ -28,6 +29,7 @@ export function CoordenadorDashboard() {
   const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);
   const [pontosMapa, setPontosMapa] = useState<PontoMapaOperacional[]>([]);
   const [decisoesSla, setDecisoesSla] = useState<SlaStatusDia[]>([]);
+  const [escalados, setEscalados] = useState(0);
   const [carregandoDados, setCarregandoDados] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [buscaNome, setBuscaNome] = useState("");
@@ -38,16 +40,18 @@ export function CoordenadorDashboard() {
     try {
       const trintaDiasAtras = new Date();
       trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-      const [rank, statusDia, pontos, sla] = await Promise.all([
+      const [rank, statusDia, pontos, sla, totalEscalados] = await Promise.all([
         listarRankingLideres(),
         statusDiaService.listarStatusDia(hojeISO()),
         listarMapaOperacional(hojeISO()),
         listarSlaStatusDia(trintaDiasAtras.toISOString().slice(0, 10)),
+        contarColaboradoresAtivos(),
       ]);
       setRanking(rank);
       setStatusDoDia(statusDia);
       setPontosMapa(pontos);
       setDecisoesSla(sla);
+      setEscalados(totalEscalados);
     } catch {
       setErro("Não foi possível carregar os dados do dashboard.");
     } finally {
@@ -73,18 +77,19 @@ export function CoordenadorDashboard() {
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
     const pendentes = statusDoDia.filter((s) => s.status === "PENDENTE").length;
-    const faltas = statusDoDia.filter((s) => s.status === "FALTA").length;
-    // "Ausentes" = todo mundo que não está presente nem aguardando aprovação
-    // (falta + atestado + folga + outros) — visão consolidada do dia.
-    const ausentes = statusDoDia.filter((s) => s.status !== "PRESENTE" && s.status !== "PENDENTE").length;
+    // Não planejadas: falta/atestado — impacto operacional imediato.
+    const naoPlanejadas = statusDoDia.filter((s) => s.status === "FALTA" || s.status === "ATESTADO").length;
+    // Planejadas: folga/outros (férias, banco de horas etc. entram como OUTROS).
+    const planejadas = statusDoDia.filter((s) => s.status === "FOLGA" || s.status === "OUTROS").length;
+    const percentualDisponivel = escalados > 0 ? Math.round((presentes / escalados) * 100) : 0;
     const slaMedio =
       ranking.length > 0
         ? Math.round(
             (ranking.reduce((soma, l) => soma + (l.pct_dentro_sla ?? 0), 0) / ranking.length) * 10
           ) / 10
         : null;
-    return { presentes, pendentes, faltas, ausentes, slaMedio };
-  }, [statusDoDia, ranking]);
+    return { presentes, pendentes, naoPlanejadas, planejadas, percentualDisponivel, slaMedio };
+  }, [statusDoDia, ranking, escalados]);
 
   const rankingSla = useMemo(() => ranquearPorLider(decisoesSla), [decisoesSla]);
   const mediaGeralMin = useMemo(() => {
@@ -118,14 +123,37 @@ export function CoordenadorDashboard() {
         )}
 
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <MetricCard label="Presentes hoje" valor={String(metricas.presentes)} destaque="primary" />
-          <MetricCard label="Faltas hoje" valor={String(metricas.faltas)} destaque="danger" />
-          <MetricCard label="Ausentes (falta+atestado+folga+outros)" valor={String(metricas.ausentes)} destaque="danger" />
-          <MetricCard label="Pendentes de aprovação" valor={String(metricas.pendentes)} destaque="warning" />
           <MetricCard
-            label="SLA médio dos líderes"
-            valor={metricas.slaMedio != null ? `${metricas.slaMedio}%` : "—"}
+            label="Efetivo escalado"
+            valor={String(escalados)}
+            tooltip="Total de colaboradores ativos esperados hoje, em todas as filiais."
+            destaque="neutral"
+          />
+          <MetricCard
+            label="Planta disponível"
+            valor={`${metricas.percentualDisponivel}%`}
+            subtitulo={`${metricas.presentes}/${escalados} presentes`}
+            tooltip="Presentes hoje sobre o total do efetivo escalado."
             destaque="primary"
+          />
+          <MetricCard
+            label="Ausências não planejadas"
+            valor={String(metricas.naoPlanejadas)}
+            tooltip="Falta + Atestado — impacto operacional imediato, exige remanejamento."
+            destaque="danger"
+          />
+          <MetricCard
+            label="Ausências planejadas"
+            valor={String(metricas.planejadas)}
+            tooltip="Folga + férias/banco de horas/outros motivos já previstos."
+            destaque="neutral"
+          />
+          <MetricCard
+            label="Gestão de ponto & SLA"
+            valor={String(metricas.pendentes)}
+            subtitulo={metricas.slaMedio != null ? `SLA médio ${metricas.slaMedio}%` : "SLA médio —"}
+            tooltip="Pendências de aprovação dos líderes e o SLA médio de atendimento."
+            destaque="warning"
           />
         </div>
 
