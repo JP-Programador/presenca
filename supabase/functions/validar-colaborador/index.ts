@@ -45,8 +45,11 @@ Deno.serve(async (req: Request) => {
   });
 
   const ip = extrairIp(req);
-  // Limite mais alto: essa função é chamada a cada dígito digitado (debounced).
-  if (!(await dentroDoLimite(supabase, "validar-colaborador", ip, 30, 300))) {
+  // Limite mais alto que os outros dois: chamada a cada dígito digitado
+  // (debounced), e o IP costuma ser compartilhado por toda a filial
+  // (Wi-Fi da empresa) — com muita gente validando matrícula ao mesmo
+  // tempo, esse é o primeiro a esbarrar num limite baixo.
+  if (!(await dentroDoLimite(supabase, "validar-colaborador", ip, 900, 300))) {
     return json({ encontrado: false }, 200);
   }
 

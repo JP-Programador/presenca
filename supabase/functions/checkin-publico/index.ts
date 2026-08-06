@@ -80,7 +80,12 @@ Deno.serve(async (req: Request) => {
   });
 
   const ip = extrairIp(req);
-  if (!(await dentroDoLimite(supabase, "checkin-publico", ip, 10, 300))) {
+  // Limite por IP, não por pessoa — muitos colaboradores da mesma
+  // filial/rede batem ponto pelo mesmo IP público (NAT do Wi-Fi da empresa),
+  // então precisa ser alto o bastante pra nunca travar um pico legítimo de
+  // check-ins simultâneos (ex.: início de turno), mas ainda limitar uma
+  // varredura de força bruta nos 4 dígitos da matrícula.
+  if (!(await dentroDoLimite(supabase, "checkin-publico", ip, 300, 300))) {
     return json(
       { error: "muitas_tentativas", mensagem: "Muitas tentativas. Aguarde alguns minutos e tente novamente." },
       429

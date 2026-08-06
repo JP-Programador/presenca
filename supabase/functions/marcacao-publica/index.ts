@@ -71,7 +71,9 @@ Deno.serve(async (req: Request) => {
   });
 
   const ip = extrairIp(req);
-  if (!(await dentroDoLimite(supabase, "marcacao-publica", ip, 10, 300))) {
+  // Mesmo raciocínio do checkin-publico: limite alto porque o IP costuma
+  // ser compartilhado por toda a filial (Wi-Fi da empresa).
+  if (!(await dentroDoLimite(supabase, "marcacao-publica", ip, 300, 300))) {
     return json(
       { error: "muitas_tentativas", mensagem: "Muitas tentativas. Aguarde alguns minutos e tente novamente." },
       429
