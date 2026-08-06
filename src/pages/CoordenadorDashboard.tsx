@@ -5,7 +5,6 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ExportButtons } from "@/components/ui/ExportButtons";
-import { PresencaMap } from "@/components/presenca/PresencaMap";
 import { PresenceMap } from "@/components/presenca/PresenceMap";
 import { RankingLideres } from "@/components/presenca/RankingLideres";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
@@ -32,7 +31,6 @@ export function CoordenadorDashboard() {
   const [decisoesSla, setDecisoesSla] = useState<SlaStatusDia[]>([]);
   const [carregandoDados, setCarregandoDados] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-  const [janela, setJanela] = useState<24 | 72 | 168>(24);
 
   async function carregar() {
     setCarregandoDados(true);
@@ -41,7 +39,7 @@ export function CoordenadorDashboard() {
       const trintaDiasAtras = new Date();
       trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
       const [regs, rank, statusDia, pontos, sla] = await Promise.all([
-        listarRegistrosParaMapa(janela),
+        listarRegistrosParaMapa(24),
         listarRankingLideres(),
         statusDiaService.listarStatusDia(hojeISO()),
         listarMapaOperacional(hojeISO()),
@@ -70,7 +68,7 @@ export function CoordenadorDashboard() {
   useEffect(() => {
     if (usuario) carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, janela]);
+  }, [usuario]);
 
   const metricas = useMemo(() => {
     const total = registros.length;
@@ -117,7 +115,7 @@ export function CoordenadorDashboard() {
         )}
 
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricCard label={`Registros (${janela}h)`} valor={String(metricas.total)} />
+          <MetricCard label="Registros (24h)" valor={String(metricas.total)} />
           <MetricCard label="Atrasados" valor={String(metricas.atrasados)} destaque="warning" />
           <MetricCard label="Ausentes" valor={String(metricas.ausentes)} destaque="danger" />
           <MetricCard
@@ -126,36 +124,6 @@ export function CoordenadorDashboard() {
             destaque="primary"
           />
         </div>
-
-        <Card className="mb-6">
-          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa das presenças</h2>
-              <p className="text-xs text-ink/50 dark:text-white/50">Registros com localização capturada.</p>
-            </div>
-            <div className="flex gap-1 rounded-md bg-surface p-1">
-              {[
-                { valor: 24, label: "24h" },
-                { valor: 72, label: "3 dias" },
-                { valor: 168, label: "7 dias" },
-              ].map((opcao) => (
-                <button
-                  key={opcao.valor}
-                  onClick={() => setJanela(opcao.valor as 24 | 72 | 168)}
-                  className={[
-                    "rounded px-2.5 py-1 text-xs font-semibold",
-                    janela === opcao.valor ? "bg-white text-primary shadow-sm" : "text-ink/50 dark:text-white/50",
-                  ].join(" ")}
-                >
-                  {opcao.label}
-                </button>
-              ))}
-            </div>
-          </CardHeader>
-          <CardBody>
-            {carregandoDados ? <MapaCarregando /> : <PresencaMap registros={registros} />}
-          </CardBody>
-        </Card>
 
         <Card className="mb-6">
           <CardHeader>

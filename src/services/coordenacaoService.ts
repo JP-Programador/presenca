@@ -101,7 +101,7 @@ export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
     coordenador_id: string | null;
     filiais: { nome: string } | null;
     coordenador: { nome: string } | null;
-    gestor_filiais: { filiais: { id: string; nome: string } }[] | null;
+    gestor_filiais: { filiais: { id: string; nome: string } | null }[] | null;
   }
 
   return ((data ?? []) as unknown as LinhaBruta[]).map((row) => ({
@@ -114,10 +114,12 @@ export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
     coordenador_id: row.coordenador_id,
     filial_home_nome: row.filiais?.nome ?? null,
     coordenador_nome: row.coordenador?.nome ?? null,
-    filiais_gerenciadas: (row.gestor_filiais ?? []).map((gf) => ({
-      id: gf.filiais.id,
-      nome: gf.filiais.nome,
-    })),
+    filiais_gerenciadas: (row.gestor_filiais ?? [])
+      .filter((gf) => gf.filiais != null)
+      .map((gf) => ({
+        id: gf.filiais!.id,
+        nome: gf.filiais!.nome,
+      })),
   }));
 }
 
