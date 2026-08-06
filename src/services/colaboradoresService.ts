@@ -57,6 +57,9 @@ export async function atualizarColaborador(
   id: string,
   dados: Partial<Pick<Colaborador, "nome" | "cargo" | "lider_id" | "ativo">>
 ) {
-  const { error } = await supabase.from("colaboradores").update(dados).eq("id", id);
+  const { data, error } = await supabase.from("colaboradores").update(dados).eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Você não tem permissão para alterar este colaborador.");
+  }
 }

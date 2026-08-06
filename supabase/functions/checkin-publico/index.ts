@@ -137,7 +137,33 @@ Deno.serve(async (req: Request) => {
 
   const colaborador = encontrados[0];
 
-  // 2. Calcula status comparando com a escala do dia (se existir)
+  // 2.1. Uma foto de "entrada" (presença) por colaborador por dia — os demais
+  // tipos (intervalo/saída) não têm esse limite.
+  if (tipo === "entrada") {
+    const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    const { data: jaRegistrouHoje, error: duplicidadeError } = await supabase
+      .from("registros_presenca")
+      .select("id")
+      .eq("colaborador_id", colaborador.id)
+      .eq("tipo", "entrada")
+      .eq("data_referencia", hojeSp)
+      .maybeSingle();
+
+    if (duplicidadeError) {
+      return json({ error: "erro_consulta", mensagem: duplicidadeError.message }, 500);
+    }
+    if (jaRegistrouHoje) {
+      return json(
+        {
+          error: "presenca_ja_registrada",
+          mensagem: "Você já registrou sua presença hoje.",
+        },
+        409
+      );
+    }
+  }
+
+  // 3. Calcula status comparando com a escala do dia (se existir)
   const agora = new Date();
   const diaSemana = agora.getDay();
   let status: "presente" | "atrasado" = "presente";
@@ -162,7 +188,7 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // 3. Decodifica e sobe a foto para o Storage
+  // 4. Decodifica e sobe a foto para o Storage
   const matches = foto_base64.match(/^data:(image\/(jpeg|png|webp));base64,([a-zA-Z0-9+/=]+)$/);
   if (!matches) {
     return json({ error: "foto_invalida", mensagem: "Formato de foto inválido." }, 400);
@@ -182,7 +208,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "falha_upload_foto", mensagem: uploadError.message }, 500);
   }
 
-  // 4. Grava o registro de presença
+  // 5. Grava o registro de presença
   const { data: registro, error: insertError } = await supabase
     .from("registros_presenca")
     .insert({
@@ -209,7 +235,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "falha_gravar_registro", mensagem: insertError.message }, 500);
   }
 
-  // 5. Move o status do dia (Módulo 6) de FALTA/FOLGA para PENDENTE
+  // 6. Move o status do dia (Módulo 6) de FALTA/FOLGA para PENDENTE
   const { error: statusDiaError } = await supabase.rpc("marcar_status_dia_pendente", {
     p_colaborador_id: colaborador.id,
     p_registro_presenca_id: registro.id,

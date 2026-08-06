@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { NovoColaboradorForm } from "@/components/presenca/NovoColaboradorForm";
 import { ImportarColaboradoresForm } from "@/components/presenca/ImportarColaboradoresForm";
 import { TrocarLiderColaborador } from "@/components/presenca/TrocarLiderColaborador";
+import { ExcluirColaboradorButton } from "@/components/presenca/ExcluirColaboradorButton";
 import { useAuth } from "@/providers/AuthProvider";
 import { listarFiliais, listarLideres } from "@/services/coordenacaoService";
 import type { PessoaSimples } from "@/services/coordenacaoService";
@@ -124,14 +125,22 @@ export function ColaboradoresGestao() {
                         {!ehLider && c.lider_nome ? ` · Líder: ${c.lider_nome}` : ""}
                       </p>
                     </div>
-                    {!ehLider && (
-                      <TrocarLiderColaborador
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!ehLider && (
+                        <TrocarLiderColaborador
+                          colaboradorId={c.id}
+                          liderAtualId={c.lider_id}
+                          lideres={lideres}
+                          onAtualizado={carregar}
+                        />
+                      )}
+                      <ExcluirColaboradorButton
                         colaboradorId={c.id}
-                        liderAtualId={c.lider_id}
-                        lideres={lideres}
+                        nome={c.nome}
+                        ativo={c.ativo}
                         onAtualizado={carregar}
                       />
-                    )}
+                    </div>
                   </li>
                 ))}
               </ul>

@@ -52,6 +52,19 @@ export async function enviarCheckin(input: CheckinInput): Promise<CheckinResulta
   });
 
   if (error) {
+    // Em resposta não-2xx da Edge Function, o supabase-js retorna data=null e
+    // error=FunctionsHttpError — o corpo JSON (com a mensagem específica, ex.:
+    // "matrícula ambígua", "já registrou presença hoje") vem em error.context
+    // (a Response original), não em `data`.
+    const contexto = (error as { context?: Response }).context;
+    if (contexto) {
+      try {
+        const corpo = await contexto.clone().json();
+        if (corpo?.mensagem) return { ok: false, mensagem: corpo.mensagem };
+      } catch {
+        // corpo não era JSON — segue para a mensagem genérica abaixo
+      }
+    }
     return { ok: false, mensagem: "Não foi possível enviar a presença. Verifique sua conexão e tente novamente." };
   }
   if (data?.error) {
