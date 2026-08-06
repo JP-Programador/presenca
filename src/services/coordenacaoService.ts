@@ -157,13 +157,23 @@ export async function atualizarPapelUsuario(
   perfil: UsuarioComHierarquia["perfil"],
   filialId: string | null
 ) {
-  const { error } = await supabase.from("perfis").update({ perfil, filial_id: filialId }).eq("id", id);
+  const { data, error } = await supabase
+    .from("perfis")
+    .update({ perfil, filial_id: filialId })
+    .eq("id", id)
+    .select("id");
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Você não tem permissão para alterar este usuário.");
+  }
 }
 
 export async function ativarDesativarUsuario(id: string, ativo: boolean) {
-  const { error } = await supabase.from("perfis").update({ ativo }).eq("id", id);
+  const { data, error } = await supabase.from("perfis").update({ ativo }).eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Você não tem permissão para ativar/desativar este usuário.");
+  }
 }
 
 export async function atribuirFilialGestor(gestorId: string, filialId: string) {

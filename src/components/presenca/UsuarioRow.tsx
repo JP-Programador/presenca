@@ -49,6 +49,8 @@ export function UsuarioRow({
     try {
       await atualizarPapelUsuario(usuario.id, novoPapel, usuario.filial_id);
       onAtualizado();
+    } catch (err) {
+      mostrar(err instanceof Error ? err.message : "Não foi possível alterar o papel do usuário.", "erro");
     } finally {
       setSalvando(false);
     }
@@ -59,6 +61,8 @@ export function UsuarioRow({
     try {
       await atualizarPapelUsuario(usuario.id, usuario.perfil, filialId || null);
       onAtualizado();
+    } catch (err) {
+      mostrar(err instanceof Error ? err.message : "Não foi possível alterar a filial do usuário.", "erro");
     } finally {
       setSalvando(false);
     }
@@ -69,6 +73,8 @@ export function UsuarioRow({
     try {
       await ativarDesativarUsuario(usuario.id, !usuario.ativo);
       onAtualizado();
+    } catch (err) {
+      mostrar(err instanceof Error ? err.message : "Não foi possível ativar/desativar o usuário.", "erro");
     } finally {
       setSalvando(false);
     }
@@ -83,6 +89,8 @@ export function UsuarioRow({
         await atribuirFilialGestor(usuario.id, filialId);
       }
       onAtualizado();
+    } catch (err) {
+      mostrar(err instanceof Error ? err.message : "Não foi possível alterar as filiais gerenciadas.", "erro");
     } finally {
       setSalvando(false);
     }
