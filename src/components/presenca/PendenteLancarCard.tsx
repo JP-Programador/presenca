@@ -7,11 +7,14 @@ interface PendenteLancarCardProps {
 }
 
 /**
- * Card "Pendente lançar presença": quem ainda está em FALTA/FOLGA hoje (não
- * fez check-in). O status programado do dia continua valendo o dia inteiro
- * (a regra não muda) — às 9h da manhã em dia útil isso só passa a ser
- * destacado em vermelho como um alerta, igual ao badge da lista de
- * pendências (Módulo 8).
+ * Card "Pendente lançar presença": quem ainda está em FALTA/FOLGA hoje sem
+ * nenhuma decisão humana em cima (decidido_por nulo) — ou seja, ainda é o
+ * valor padrão criado pelo sistema, ninguém olhou pra isso ainda. Assim que
+ * o líder ou coordenador lança qualquer status manualmente (inclusive
+ * confirmando "sim, é falta mesmo"), decidido_por deixa de ser nulo e a
+ * pessoa sai da lista — o status programado do dia continua valendo, isso
+ * é só sobre já ter sido revisado ou não. Às 9h da manhã em dia útil isso
+ * passa a ser destacado em vermelho como alerta.
  */
 export function PendenteLancarCard({ itens }: PendenteLancarCardProps) {
   const apos9h = useMemo(apos9hEmDiaUtil, []);
@@ -19,7 +22,7 @@ export function PendenteLancarCard({ itens }: PendenteLancarCardProps) {
   const pendentes = useMemo(
     () =>
       itens
-        .filter((i) => i.status === "FALTA" || i.status === "FOLGA")
+        .filter((i) => (i.status === "FALTA" || i.status === "FOLGA") && !i.decidido_por)
         .sort((a, b) => (a.colaborador_nome ?? "").localeCompare(b.colaborador_nome ?? "")),
     [itens]
   );

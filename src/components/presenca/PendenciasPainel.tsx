@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { obterUrlFoto } from "@/services/presencaService";
 import { apos9hEmDiaUtil } from "@/lib/calendario";
-import { STATUS_DIA_LABEL, type StatusDia, type StatusDiaRegistro } from "@/types/status";
+import { STATUS_DIA_LABEL, type StatusDiaRegistro } from "@/types/status";
 
 /** Botão que revela a foto do check-in — visível a qualquer login (inclusive somente leitura), já que é uma ação de consulta, não de escrita. */
 function VerFoto({ fotoPath, nome }: { fotoPath: string; nome: string }) {
@@ -75,12 +75,16 @@ const CORES_QUANDO_ATIVO: Record<Filtro, string> = {
 
 const NEUTRO = "bg-surface text-ink/70 dark:bg-white/10 dark:text-white/70";
 
-function pertenceAoFiltro(status: StatusDia, filtro: Filtro): boolean {
+function pertenceAoFiltro(item: StatusDiaRegistro, filtro: Filtro): boolean {
+  const { status } = item;
   switch (filtro) {
     case "todos":
       return true;
     case "nao_lancaram":
-      return status === "FALTA" || status === "FOLGA";
+      // Só quem ainda não teve nenhuma decisão humana (decidido_por nulo) —
+      // uma vez que o líder/coordenador confirma manualmente o status
+      // (mesmo que seja "sim, é falta"), sai daqui.
+      return (status === "FALTA" || status === "FOLGA") && !item.decidido_por;
     case "aguardando_aprovacao":
       return status === "PENDENTE";
     case "presentes":
@@ -132,7 +136,7 @@ export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, o
     };
     for (const item of itens) {
       for (const f of FILTROS) {
-        if (f.chave !== "todos" && pertenceAoFiltro(item.status, f.chave)) mapa[f.chave]++;
+        if (f.chave !== "todos" && pertenceAoFiltro(item, f.chave)) mapa[f.chave]++;
       }
     }
     return mapa;
@@ -141,7 +145,7 @@ export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, o
   const filtrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     return itens.filter((item) => {
-      if (!pertenceAoFiltro(item.status, filtro)) return false;
+      if (!pertenceAoFiltro(item, filtro)) return false;
       if (!termo) return true;
       return (
         item.colaborador_nome?.toLowerCase().includes(termo) ||
@@ -186,8 +190,8 @@ export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, o
         <Card>
           <ul className="divide-y divide-ink/5 dark:divide-white/5">
             {filtrados.map((item) => {
-              const destacado = destacarFaltas && item.status === "FALTA" && filtro === "todos";
-              const corBadge = filtro !== "todos" && pertenceAoFiltro(item.status, filtro) ? CORES_QUANDO_ATIVO[filtro] : NEUTRO;
+              const destacado = destacarFaltas && item.status === "FALTA" && !item.decidido_por && filtro === "todos";
+              const corBadge = filtro !== "todos" && pertenceAoFiltro(item, filtro) ? CORES_QUANDO_ATIVO[filtro] : NEUTRO;
               return (
                 <li
                   key={item.id}
