@@ -62,7 +62,9 @@ export function CoordenadorDashboard() {
     executar: () => Promise<StatusDiaRegistro>
   ) {
     const atualizado = await executar();
-    setStatusDoDia((prev) => prev.map((item) => (item.id === row.id ? atualizado : item)));
+    // A RPC no banco retorna só a linha crua de status_dia (sem os campos de JOIN,
+    // ex.: colaborador_nome) — preserva o que já temos e sobrescreve só o que mudou.
+    setStatusDoDia((prev) => prev.map((item) => (item.id === row.id ? { ...item, ...atualizado } : item)));
   }
 
   useEffect(() => {
