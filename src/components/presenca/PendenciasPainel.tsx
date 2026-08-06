@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { obterUrlFoto } from "@/services/presencaService";
+import { apos9hEmDiaUtil } from "@/lib/calendario";
 import { STATUS_DIA_LABEL, type StatusDia, type StatusDiaRegistro } from "@/types/status";
 
 /** Botão que revela a foto do check-in — visível a qualquer login (inclusive somente leitura), já que é uma ação de consulta, não de escrita. */
@@ -93,14 +94,6 @@ function pertenceAoFiltro(status: StatusDia, filtro: Filtro): boolean {
     case "outros":
       return status === "OUTROS";
   }
-}
-
-/** true se, agora, já passou das 09:00 em um dia útil (regra de destaque de faltas). */
-function apos9hEmDiaUtil(): boolean {
-  const agora = new Date();
-  const diaSemana = agora.getDay(); // 0=domingo...6=sábado
-  const ehUtil = diaSemana !== 0 && diaSemana !== 6;
-  return ehUtil && agora.getHours() >= 9;
 }
 
 interface PendenciasPainelProps {

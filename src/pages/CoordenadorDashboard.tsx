@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/Alert";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { ExportButtons } from "@/components/ui/ExportButtons";
 import { PresenceMap } from "@/components/presenca/PresenceMap";
+import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { RankingLideres } from "@/components/presenca/RankingLideres";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
@@ -155,6 +156,10 @@ export function CoordenadorDashboard() {
             tooltip="Pendências de aprovação dos líderes e o SLA médio de atendimento."
             destaque="warning"
           />
+        </div>
+
+        <div className="mb-6">
+          <PendenteLancarCard itens={statusDoDia} />
         </div>
 
         <Card className="mb-6">

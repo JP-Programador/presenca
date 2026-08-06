@@ -3,6 +3,7 @@ import { BrandHeader } from "@/components/layout/BrandHeader";
 import { NavPaineis } from "@/components/layout/NavPaineis";
 import { Alert } from "@/components/ui/Alert";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { MiniMapCard } from "@/components/presenca/MiniMapCard";
@@ -102,6 +103,10 @@ export function LiderDashboard() {
             tooltip="Check-ins aguardando sua aprovação."
             destaque="warning"
           />
+        </div>
+
+        <div className="mb-5">
+          <PendenteLancarCard itens={statusDoDia} />
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-2 rounded-md bg-white p-1 shadow-sm dark:bg-[#242424] sm:flex">

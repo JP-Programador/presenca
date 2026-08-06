@@ -59,6 +59,19 @@ export function rotuloTipoDia(tipo: TipoDia): string {
   }
 }
 
+/**
+ * true se, agora, já passou das 09:00 em um dia útil — corte usado pra
+ * destacar quem ainda não lançou presença (o status programado do dia
+ * continua valendo o dia inteiro; isso é só o ponto a partir do qual a
+ * ausência de lançamento vira um alerta visual).
+ */
+export function apos9hEmDiaUtil(): boolean {
+  const agora = new Date();
+  const diaSemana = agora.getDay(); // 0=domingo...6=sábado
+  const ehUtil = diaSemana !== 0 && diaSemana !== 6;
+  return ehUtil && agora.getHours() >= 9;
+}
+
 /** Gera a lista de datas ISO (inclusive) entre duas datas, para telas de relatório/calendário. */
 export function intervaloDeDatas(inicioISO: string, fimISO: string): string[] {
   const [anoI, mesI, diaI] = inicioISO.split("-").map(Number);
