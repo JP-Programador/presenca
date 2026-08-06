@@ -80,12 +80,12 @@ export async function listarFiliais(): Promise<Filial[]> {
   return data as Filial[];
 }
 
-/** Usuários do sistema com sua filial "home" e as filiais que gerenciam (se gestor). */
+/** Usuários do sistema com sua filial "home". */
 export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
   const { data, error } = await supabase
     .from("perfis")
     .select(
-      "id, nome, email, perfil, filial_id, ativo, coordenador_id, filiais!filial_id(nome), gestor_filiais(filial_id, filiais!filial_id(id, nome)), coordenador:perfis!coordenador_id(nome)"
+      "id, nome, email, perfil, filial_id, ativo, coordenador_id, filiais!filial_id(nome), coordenador:perfis!coordenador_id(nome)"
     )
     .order("nome");
 
@@ -101,7 +101,6 @@ export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
     coordenador_id: string | null;
     filiais: { nome: string } | null;
     coordenador: { nome: string } | null;
-    gestor_filiais: { filiais: { id: string; nome: string } | null }[] | null;
   }
 
   return ((data ?? []) as unknown as LinhaBruta[]).map((row) => ({
@@ -114,12 +113,6 @@ export async function listarUsuarios(): Promise<UsuarioComHierarquia[]> {
     coordenador_id: row.coordenador_id,
     filial_home_nome: row.filiais?.nome ?? null,
     coordenador_nome: row.coordenador?.nome ?? null,
-    filiais_gerenciadas: (row.gestor_filiais ?? [])
-      .filter((gf) => gf.filiais != null)
-      .map((gf) => ({
-        id: gf.filiais!.id,
-        nome: gf.filiais!.nome,
-      })),
   }));
 }
 
@@ -176,26 +169,11 @@ export async function ativarDesativarUsuario(id: string, ativo: boolean) {
   }
 }
 
-export async function atribuirFilialGestor(gestorId: string, filialId: string) {
-  const { error } = await supabase.from("gestor_filiais").insert({ gestor_id: gestorId, filial_id: filialId });
-  if (error) throw error;
-}
-
-export async function removerFilialGestor(gestorId: string, filialId: string) {
-  const { error } = await supabase
-    .from("gestor_filiais")
-    .delete()
-    .eq("gestor_id", gestorId)
-    .eq("filial_id", filialId);
-  if (error) throw error;
-}
-
 export interface NovoUsuarioInput {
   nome: string;
   email: string;
   perfil: UsuarioComHierarquia["perfil"];
   filial_id?: string | null;
-  filiais_gerenciadas?: string[];
   /** Coordenador direto — só relevante quando perfil = 'gestor' e quem cria é admin (coordenador vira o próprio automaticamente). */
   coordenador_id?: string | null;
 }

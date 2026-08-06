@@ -29,15 +29,10 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
   const [email, setEmail] = useState("");
   const [perfil, setPerfil] = useState<PerfilAcesso>(criadorEhCoordenador ? "gestor" : "colaborador");
   const [filialId, setFilialId] = useState("");
-  const [filiaisGerenciadas, setFiliaisGerenciadas] = useState<string[]>([]);
   const [coordenadorId, setCoordenadorId] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [senhaGerada, setSenhaGerada] = useState<string | null>(null);
-
-  function alternarFilialGerenciada(id: string) {
-    setFiliaisGerenciadas((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
-  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,7 +45,6 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
         email,
         perfil,
         filial_id: perfil === "coordenador" || perfil === "gestor" ? null : filialId || null,
-        filiais_gerenciadas: perfil === "gestor" ? filiaisGerenciadas : undefined,
         coordenador_id: perfil === "gestor" && !criadorEhCoordenador ? coordenadorId || null : undefined,
       });
       setSenhaGerada(resultado.senha_inicial);
@@ -58,7 +52,6 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
       setEmail("");
       setPerfil(criadorEhCoordenador ? "gestor" : "colaborador");
       setFilialId("");
-      setFiliaisGerenciadas([]);
       setCoordenadorId("");
       onCriado();
     } catch (err) {
@@ -148,31 +141,6 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
               </option>
             ))}
           </select>
-        </div>
-      )}
-
-      {perfil === "gestor" && (
-        <div>
-          <span className="mb-1.5 block text-sm font-medium text-ink dark:text-white">
-            Filiais que este gestor vai gerenciar
-          </span>
-          <div className="flex flex-wrap gap-2">
-            {filiais.map((f) => (
-              <button
-                type="button"
-                key={f.id}
-                onClick={() => alternarFilialGerenciada(f.id)}
-                className={[
-                  "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                  filiaisGerenciadas.includes(f.id)
-                    ? "border-primary bg-[#FDE9DD] text-primary-dark"
-                    : "border-ink/15 bg-white text-ink/60 dark:border-white/15 dark:bg-[#242424] dark:text-white/60",
-                ].join(" ")}
-              >
-                {f.nome}
-              </button>
-            ))}
-          </div>
         </div>
       )}
 

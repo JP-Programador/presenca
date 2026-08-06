@@ -21,18 +21,32 @@ export interface LiderFilial {
   lider_nome: string;
 }
 
-/** Mapeamento filial -> líder(es) responsáveis, usado no filtro "por líder" do mapa. */
+/**
+ * Mapeamento filial -> líder(es) responsáveis, usado no filtro "por líder" do
+ * mapa. Derivado direto de quem lidera quem (colaboradores.lider_id) — não de
+ * uma atribuição manual de filial (esse modelo antigo, via gestor_filiais,
+ * dava a um líder visão de TODA a filial, não só da sua equipe direta).
+ */
 export async function listarLideresPorFilial(): Promise<LiderFilial[]> {
   const { data, error } = await supabase
-    .from("gestor_filiais")
-    .select("filial_id, filiais(nome), gestor_id, perfis(nome)");
+    .from("colaboradores")
+    .select("filial_id, filiais(nome), lider_id, lider:perfis!lider_id(nome)")
+    .not("lider_id", "is", null);
 
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
-    filial_id: row.filial_id,
-    filial_nome: row.filiais?.nome ?? "",
-    lider_id: row.gestor_id,
-    lider_nome: row.perfis?.nome ?? "",
-  }));
+  const vistos = new Set<string>();
+  const linhas: LiderFilial[] = [];
+  for (const row of (data ?? []) as any[]) {
+    const chave = `${row.lider_id}:${row.filial_id}`;
+    if (vistos.has(chave)) continue;
+    vistos.add(chave);
+    linhas.push({
+      filial_id: row.filial_id,
+      filial_nome: row.filiais?.nome ?? "",
+      lider_id: row.lider_id,
+      lider_nome: row.lider?.nome ?? "",
+    });
+  }
+  return linhas;
 }

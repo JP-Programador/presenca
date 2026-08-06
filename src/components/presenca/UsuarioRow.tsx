@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type { Filial, PerfilAcesso, UsuarioComHierarquia } from "@/types/domain";
-import {
-  ativarDesativarUsuario,
-  atribuirFilialGestor,
-  atualizarPapelUsuario,
-  removerFilialGestor,
-} from "@/services/coordenacaoService";
+import { ativarDesativarUsuario, atualizarPapelUsuario } from "@/services/coordenacaoService";
 import { redefinirSenhaAdmin } from "@/services/authService";
 import { useToast } from "@/providers/ToastProvider";
 import { useAuth } from "@/providers/AuthProvider";
@@ -28,7 +23,6 @@ export function UsuarioRow({
   filiais: Filial[];
   onAtualizado: () => void;
 }) {
-  const [expandido, setExpandido] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const { mostrar } = useToast();
   const { usuario: usuarioLogado } = useAuth();
@@ -83,22 +77,6 @@ export function UsuarioRow({
     }
   }
 
-  async function alternarFilialGerenciada(filialId: string, jaGerencia: boolean) {
-    setSalvando(true);
-    try {
-      if (jaGerencia) {
-        await removerFilialGestor(usuario.id, filialId);
-      } else {
-        await atribuirFilialGestor(usuario.id, filialId);
-      }
-      onAtualizado();
-    } catch (err) {
-      mostrar(err instanceof Error ? err.message : "Não foi possível alterar as filiais gerenciadas.", "erro");
-    } finally {
-      setSalvando(false);
-    }
-  }
-
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -128,15 +106,6 @@ export function UsuarioRow({
             ))}
           </select>
 
-          {usuario.perfil === "gestor" && (
-            <button
-              onClick={() => setExpandido((v) => !v)}
-              className="text-xs font-semibold text-primary hover:underline"
-            >
-              {expandido ? "Ocultar filiais" : "Gerenciar filiais"}
-            </button>
-          )}
-
           {souAdmin && (
             <Button variant="ghost" size="md" onClick={redefinirSenha} disabled={salvando}>
               Redefinir senha
@@ -165,32 +134,6 @@ export function UsuarioRow({
           ))}
         </select>
       </div>
-
-      {usuario.perfil === "gestor" && expandido && (
-        <div className="mt-3 rounded-md bg-surface p-3">
-          <p className="mb-2 text-xs font-semibold text-ink/60">Filiais gerenciadas por {usuario.nome.split(" ")[0]}:</p>
-          <div className="flex flex-wrap gap-2">
-            {filiais.map((f) => {
-              const jaGerencia = usuario.filiais_gerenciadas.some((fg) => fg.id === f.id);
-              return (
-                <button
-                  key={f.id}
-                  disabled={salvando}
-                  onClick={() => alternarFilialGerenciada(f.id, jaGerencia)}
-                  className={[
-                    "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-                    jaGerencia
-                      ? "border-primary bg-[#FDE9DD] text-primary-dark"
-                      : "border-ink/15 bg-white text-ink/50",
-                  ].join(" ")}
-                >
-                  {f.nome} {jaGerencia ? "✓" : "+"}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </li>
   );
 }

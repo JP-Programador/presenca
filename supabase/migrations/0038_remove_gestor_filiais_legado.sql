@@ -1,0 +1,23 @@
+-- =========================================================
+-- 0038 · Remove atribuições legadas de gestor_filiais
+--
+-- Bug real: a UI de "Filiais que este gestor vai gerenciar" (criar/editar
+-- usuário) ainda escrevia em tlp_presenca.gestor_filiais, um modelo antigo
+-- de visibilidade ("líder vê a filial inteira") que várias policies de RLS
+-- ainda aceitam via tlp_presenca.gerencio_filial() — em paralelo ao modelo
+-- de hierarquia direta (0028: colaboradores.lider_id), que é o pretendido.
+-- Resultado: um líder com qualquer filial atribuída em gestor_filiais
+-- passava a ver/aprovar TODOS os colaboradores daquela filial, não só os
+-- diretamente abaixo dele.
+--
+-- A UI que escrevia nessa tabela foi removida do frontend nesta mesma
+-- entrega. Esta migration limpa o que já tinha sido atribuído (inclusive
+-- depois do reset 0037, já que "criar usuário" continuava expondo o
+-- campo). Não dropamos a tabela nem gerencio_filial(): a função continua
+-- referenciada por várias policies (colaboradores, registros_presenca,
+-- justificativas, escalas, status_dia, storage) — sem nenhuma linha em
+-- gestor_filiais ela nunca mais concede acesso além de sou_admin(),
+-- então o efeito prático é o mesmo de remover, com bem menos risco.
+-- =========================================================
+
+delete from tlp_presenca.gestor_filiais;

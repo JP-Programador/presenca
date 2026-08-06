@@ -41,7 +41,6 @@ interface CriarUsuarioPayload {
   email: string;
   perfil: "admin" | "auditor" | "coordenador" | "gestor" | "colaborador";
   filial_id?: string | null;
-  filiais_gerenciadas?: string[]; // usado quando perfil = 'gestor'
   coordenador_id?: string | null; // usado quando perfil = 'gestor' e quem cria é admin
 }
 
@@ -134,18 +133,6 @@ Deno.serve(async (req: Request) => {
 
   if (erroPerfil) {
     return json({ error: "falha_atualizar_perfil", mensagem: erroPerfil.message }, 500);
-  }
-
-  // 3. Se for gestor, associa as filiais que ele vai gerenciar
-  if (payload.perfil === "gestor" && payload.filiais_gerenciadas?.length) {
-    const linhas = payload.filiais_gerenciadas.map((filial_id) => ({
-      gestor_id: novoUsuario.user!.id,
-      filial_id,
-    }));
-    const { error: erroGestorFiliais } = await supabaseAdmin.from("gestor_filiais").insert(linhas);
-    if (erroGestorFiliais) {
-      return json({ error: "falha_associar_filiais", mensagem: erroGestorFiliais.message }, 500);
-    }
   }
 
   return json({ ok: true, usuario_id: novoUsuario.user.id, senha_inicial: SENHA_INICIAL });

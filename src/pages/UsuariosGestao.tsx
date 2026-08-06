@@ -62,7 +62,7 @@ export function UsuariosGestao() {
     email: u.email,
     papel: PAPEL_LABEL[u.perfil] ?? u.perfil,
     filial_origem: u.filial_home_nome ?? "",
-    filiais_gerenciadas: u.filiais_gerenciadas.map((f) => f.nome).join(", "),
+    coordenador: u.coordenador_nome ?? "",
     status: u.ativo ? "Ativo" : "Inativo",
   }));
 
@@ -111,7 +111,7 @@ export function UsuariosGestao() {
                 { chave: "email", titulo: "E-mail" },
                 { chave: "papel", titulo: "Papel" },
                 { chave: "filial_origem", titulo: "Filial de origem" },
-                { chave: "filiais_gerenciadas", titulo: "Filiais gerenciadas" },
+                { chave: "coordenador", titulo: "Coordenador" },
                 { chave: "status", titulo: "Status" },
               ]}
             />

@@ -100,7 +100,6 @@ export interface AuditLogEntry {
 export interface UsuarioComHierarquia extends PerfilUsuario {
   filial_home_nome?: string | null;
   coordenador_nome?: string | null;
-  filiais_gerenciadas: { id: string; nome: string }[];
   ativo: boolean;
 }
 

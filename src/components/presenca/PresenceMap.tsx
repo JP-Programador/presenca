@@ -53,7 +53,7 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
   const colaboradores = useMemo(() => {
     const mapa = new Map<string, string>();
     pontos
-      .filter((p) => p.status === "PRESENTE")
+      .filter((p) => p.status === "PRESENTE" || p.status === "PENDENTE")
       .forEach((p) => mapa.set(p.colaborador_id, p.colaborador_nome));
     return Array.from(mapa.entries())
       .map(([id, nome]) => ({ id, nome }))
@@ -63,10 +63,11 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
   const filtrados = useMemo(() => {
     const termo = (nomeFiltro ?? "").trim().toLowerCase();
     return pontos.filter((p) => {
-      // O mapa só mostra quem está com o dia confirmado como Presente — se o
-      // líder marcou Falta/Atestado/Folga/Outros (mesmo que o colaborador alegue
-      // ter trabalhado), some do mapa, já que o status manual do líder prevalece.
-      if (p.status !== "PRESENTE") return false;
+      // O mapa mostra quem fez check-in de verdade (Presente ou aguardando
+      // aprovação, ambos com GPS do próprio check-in). Se o líder marcou
+      // Falta/Atestado/Folga/Outros manualmente, some do mapa — esses não têm
+      // localização de check-in e o status manual do líder prevalece.
+      if (p.status !== "PRESENTE" && p.status !== "PENDENTE") return false;
       if (filialFiltro && p.filial_id !== filialFiltro) return false;
       if (filialIdsDoLider && !filialIdsDoLider.has(p.filial_id)) return false;
       if (colaboradorFiltro && p.colaborador_id !== colaboradorFiltro) return false;
