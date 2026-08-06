@@ -105,6 +105,10 @@ export async function aplicarEvento(
     p_registro_presenca_id: null,
     p_motivo_outros: evento.tipo === "MARCAR_MANUAL" ? evento.motivoOutros ?? null : null,
     p_observacao: evento.tipo === "MARCAR_MANUAL" ? evento.observacao ?? null : null,
+    // Marcação manual do líder: o status escolhido vale como está (não deixa
+    // o servidor recalcular FALTA/FOLGA pro "repouso" do dia — isso é só pra
+    // rejeição automática).
+    p_forcar_status: evento.tipo === "MARCAR_MANUAL",
   });
 
   if (error) throw error;

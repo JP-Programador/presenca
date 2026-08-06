@@ -58,13 +58,10 @@ export function transicionar(
         throw new TransicaoInvalidaError("Status OUTROS exige um motivo.");
       }
       // Ações manuais do líder podem ser aplicadas a partir de qualquer estado
-      // (ex.: corrigir um PRESENTE indevido para FALTA, ou uma FALTA para ATESTADO).
-      // FALTA/FOLGA são sempre resolvidos para o repouso do dia: feriado/fim de
-      // semana conta como FOLGA automaticamente, mesmo que o líder peça FALTA
-      // (o servidor recalcula da mesma forma — ver transicionar_status_dia).
-      if (evento.status === "FALTA" || evento.status === "FOLGA") {
-        return repouso;
-      }
+      // (ex.: corrigir um PRESENTE indevido para FALTA, ou uma FALTA para ATESTADO)
+      // e o status escolhido é sempre o que fica — o líder pode marcar FOLGA
+      // num dia útil (folga compensatória, por exemplo) ou FALTA num fim de
+      // semana/feriado, sem o sistema sobrescrever pra "repouso" do dia.
       return evento.status;
 
     default:
