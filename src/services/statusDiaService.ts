@@ -70,6 +70,24 @@ export async function listarStatusDia(
   return ((data ?? []) as unknown as StatusDiaRowBruta[]).map(mapearLinha);
 }
 
+/** Lista os status do dia de um período (ex.: um mês inteiro), com filtro opcional por filial — base da tabela mensal em grade. */
+export async function listarStatusDiaPeriodo(
+  inicioISO: string,
+  fimISO: string,
+  filialId?: string
+): Promise<StatusDiaRegistro[]> {
+  let query = supabase
+    .from("status_dia")
+    .select(SELECT_COLUNAS)
+    .gte("data_referencia", inicioISO)
+    .lte("data_referencia", fimISO);
+  if (filialId) query = query.eq("filial_id", filialId);
+
+  const { data, error } = await query.order("data_referencia", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as unknown as StatusDiaRowBruta[]).map(mapearLinha);
+}
+
 /**
  * Aplica uma transição de estado, validando localmente (feedback imediato)
  * antes de chamar a função transacional do banco (tlp_presenca.transicionar_status_dia),
