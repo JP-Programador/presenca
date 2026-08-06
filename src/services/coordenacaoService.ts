@@ -1,37 +1,5 @@
 import { supabase } from "@/services/supabaseClient";
-import type { AuditLogEntry, Filial, RegistroPresenca, SlaLider, UsuarioComHierarquia } from "@/types/domain";
-
-/** Registros com coordenadas nas últimas `horas` horas, para o mapa de presenças. */
-export async function listarRegistrosParaMapa(horas = 24): Promise<RegistroPresenca[]> {
-  const desde = new Date(Date.now() - horas * 60 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from("registros_presenca")
-    .select(
-      "id, colaborador_id, filial_id, tipo, status, data_referencia, horario_registrado, latitude, longitude, colaboradores(nome), filiais(nome)"
-    )
-    .not("latitude", "is", null)
-    .not("longitude", "is", null)
-    .gte("horario_registrado", desde)
-    .order("horario_registrado", { ascending: false })
-    .limit(500);
-
-  if (error) throw error;
-
-  type LinhaBruta = Omit<RegistroPresenca, "colaborador_nome" | "filial_nome" | "colaborador_matricula"> & {
-    colaboradores: { nome: string } | null;
-    filiais: { nome: string } | null;
-  };
-
-  // O cliente Supabase não infere o tipo do join a partir da string do select
-  // (database.types.ts é um placeholder sem Relationships reais); o formato
-  // da linha é garantido pela query acima.
-  return ((data ?? []) as unknown as LinhaBruta[]).map((row) => ({
-    ...row,
-    colaborador_nome: row.colaboradores?.nome,
-    filial_nome: row.filiais?.nome,
-  }));
-}
+import type { AuditLogEntry, Filial, SlaLider, UsuarioComHierarquia } from "@/types/domain";
 
 /** Ranking de líderes por volume de decisões e SLA de aprovação (view vw_sla_lideres). */
 export async function listarRankingLideres(): Promise<SlaLider[]> {

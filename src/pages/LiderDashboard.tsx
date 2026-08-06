@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BrandHeader } from "@/components/layout/BrandHeader";
 import { NavPaineis } from "@/components/layout/NavPaineis";
 import { Alert } from "@/components/ui/Alert";
+import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { MiniMapCard } from "@/components/presenca/MiniMapCard";
@@ -55,6 +56,16 @@ export function LiderDashboard() {
     if (usuario) carregar();
   }, [usuario]);
 
+  const metricas = useMemo(() => {
+    const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
+    const pendentes = statusDoDia.filter((s) => s.status === "PENDENTE").length;
+    const faltas = statusDoDia.filter((s) => s.status === "FALTA").length;
+    // "Ausentes" = todo mundo que não está presente nem aguardando aprovação
+    // (falta + atestado + folga + outros).
+    const ausentes = statusDoDia.filter((s) => s.status !== "PRESENTE" && s.status !== "PENDENTE").length;
+    return { presentes, pendentes, faltas, ausentes };
+  }, [statusDoDia]);
+
   if (!usuario) return null; // narrowing de tipo; na prática nunca alcançado (ver RequireAuth)
 
   const ehAuditor = usuario.perfil === "auditor";
@@ -68,6 +79,13 @@ export function LiderDashboard() {
       />
 
       <main className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MetricCard label="Presentes hoje" valor={String(metricas.presentes)} destaque="primary" />
+          <MetricCard label="Faltas hoje" valor={String(metricas.faltas)} destaque="danger" />
+          <MetricCard label="Ausentes (falta+atestado+folga+outros)" valor={String(metricas.ausentes)} destaque="danger" />
+          <MetricCard label="Pendentes de aprovação" valor={String(metricas.pendentes)} destaque="warning" />
+        </div>
+
         <div className="mb-5 grid grid-cols-2 gap-2 rounded-md bg-white p-1 shadow-sm dark:bg-[#242424] sm:flex">
           <button
             onClick={() => setAba("status_dia")}

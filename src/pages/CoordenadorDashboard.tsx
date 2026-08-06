@@ -14,17 +14,16 @@ import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
 import { useAuth } from "@/providers/AuthProvider";
 import { hojeISO } from "@/lib/calendario";
-import { listarRankingLideres, listarRegistrosParaMapa } from "@/services/coordenacaoService";
+import { listarRankingLideres } from "@/services/coordenacaoService";
 import * as statusDiaService from "@/services/statusDiaService";
 import { listarMapaOperacional } from "@/services/mapaOperacionalService";
 import { listarSlaStatusDia, mediaDiaria, mediaMensal, ranquearPorLider } from "@/services/slaService";
-import type { RegistroPresenca, SlaLider } from "@/types/domain";
+import type { SlaLider } from "@/types/domain";
 import type { MotivoOutros, PontoMapaOperacional, SlaStatusDia, StatusDiaRegistro } from "@/types/status";
 
 export function CoordenadorDashboard() {
   // Papel (admin/coordenador) já validado por <RequireRole> na definição das rotas.
   const { usuario, sair } = useAuth();
-  const [registros, setRegistros] = useState<RegistroPresenca[]>([]);
   const [ranking, setRanking] = useState<SlaLider[]>([]);
   const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);
   const [pontosMapa, setPontosMapa] = useState<PontoMapaOperacional[]>([]);
@@ -39,14 +38,12 @@ export function CoordenadorDashboard() {
     try {
       const trintaDiasAtras = new Date();
       trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-      const [regs, rank, statusDia, pontos, sla] = await Promise.all([
-        listarRegistrosParaMapa(24),
+      const [rank, statusDia, pontos, sla] = await Promise.all([
         listarRankingLideres(),
         statusDiaService.listarStatusDia(hojeISO()),
         listarMapaOperacional(hojeISO()),
         listarSlaStatusDia(trintaDiasAtras.toISOString().slice(0, 10)),
       ]);
-      setRegistros(regs);
       setRanking(rank);
       setStatusDoDia(statusDia);
       setPontosMapa(pontos);
@@ -74,17 +71,20 @@ export function CoordenadorDashboard() {
   }, [usuario]);
 
   const metricas = useMemo(() => {
-    const total = registros.length;
-    const atrasados = registros.filter((r) => r.status === "atrasado").length;
-    const ausentes = registros.filter((r) => r.status === "ausente").length;
+    const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
+    const pendentes = statusDoDia.filter((s) => s.status === "PENDENTE").length;
+    const faltas = statusDoDia.filter((s) => s.status === "FALTA").length;
+    // "Ausentes" = todo mundo que não está presente nem aguardando aprovação
+    // (falta + atestado + folga + outros) — visão consolidada do dia.
+    const ausentes = statusDoDia.filter((s) => s.status !== "PRESENTE" && s.status !== "PENDENTE").length;
     const slaMedio =
       ranking.length > 0
         ? Math.round(
             (ranking.reduce((soma, l) => soma + (l.pct_dentro_sla ?? 0), 0) / ranking.length) * 10
           ) / 10
         : null;
-    return { total, atrasados, ausentes, slaMedio };
-  }, [registros, ranking]);
+    return { presentes, pendentes, faltas, ausentes, slaMedio };
+  }, [statusDoDia, ranking]);
 
   const rankingSla = useMemo(() => ranquearPorLider(decisoesSla), [decisoesSla]);
   const mediaGeralMin = useMemo(() => {
@@ -117,10 +117,11 @@ export function CoordenadorDashboard() {
           </div>
         )}
 
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricCard label="Registros (24h)" valor={String(metricas.total)} />
-          <MetricCard label="Atrasados" valor={String(metricas.atrasados)} destaque="warning" />
-          <MetricCard label="Ausentes" valor={String(metricas.ausentes)} destaque="danger" />
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <MetricCard label="Presentes hoje" valor={String(metricas.presentes)} destaque="primary" />
+          <MetricCard label="Faltas hoje" valor={String(metricas.faltas)} destaque="danger" />
+          <MetricCard label="Ausentes (falta+atestado+folga+outros)" valor={String(metricas.ausentes)} destaque="danger" />
+          <MetricCard label="Pendentes de aprovação" valor={String(metricas.pendentes)} destaque="warning" />
           <MetricCard
             label="SLA médio dos líderes"
             valor={metricas.slaMedio != null ? `${metricas.slaMedio}%` : "—"}
