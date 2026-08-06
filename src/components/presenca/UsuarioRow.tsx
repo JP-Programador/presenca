@@ -7,8 +7,9 @@ import {
   atualizarPapelUsuario,
   removerFilialGestor,
 } from "@/services/coordenacaoService";
-import { solicitarRedefinicaoSenha } from "@/services/authService";
+import { redefinirSenhaAdmin } from "@/services/authService";
 import { useToast } from "@/providers/ToastProvider";
+import { useAuth } from "@/providers/AuthProvider";
 
 const PAPEL_LABEL: Record<PerfilAcesso, string> = {
   admin: "Administrador",
@@ -30,13 +31,15 @@ export function UsuarioRow({
   const [expandido, setExpandido] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const { mostrar } = useToast();
+  const { usuario: usuarioLogado } = useAuth();
+  const souAdmin = usuarioLogado?.perfil === "admin";
 
   async function redefinirSenha() {
     setSalvando(true);
     try {
-      const { error } = await solicitarRedefinicaoSenha(usuario.email, usuario.id);
+      const { error } = await redefinirSenhaAdmin(usuario.id);
       mostrar(
-        error ? "Não foi possível enviar o e-mail de redefinição." : "E-mail de redefinição enviado.",
+        error ? error : `Senha redefinida para "Mudar@123" — avise a pessoa por fora, ela vai precisar trocar no próximo login.`,
         error ? "erro" : "sucesso"
       );
     } finally {
@@ -134,9 +137,11 @@ export function UsuarioRow({
             </button>
           )}
 
-          <Button variant="ghost" size="md" onClick={redefinirSenha} disabled={salvando}>
-            Redefinir senha
-          </Button>
+          {souAdmin && (
+            <Button variant="ghost" size="md" onClick={redefinirSenha} disabled={salvando}>
+              Redefinir senha
+            </Button>
+          )}
 
           <Button variant="ghost" size="md" onClick={alternarAtivo} disabled={salvando}>
             {usuario.ativo ? "Desativar" : "Ativar"}

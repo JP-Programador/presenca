@@ -1,10 +1,10 @@
 // supabase/functions/admin-criar-usuario/index.ts
 //
 // Cria um novo usuário de login (auth.users) + a linha correspondente em
-// tlp_presenca.perfis. Sem convite por e-mail: o usuário nasce com uma senha
-// aleatória (gerada aqui e devolvida uma única vez na resposta, para quem
-// criou passar por fora) e a flag senha_temporaria=true, que obriga a troca
-// no primeiro acesso (ver TrocarSenhaObrigatoria.tsx no frontend).
+// tlp_presenca.perfis. Sem convite por e-mail (o projeto não tem SMTP
+// configurado — e-mails de convite/redefinição não chegam): o usuário nasce
+// com a senha inicial fixa abaixo e a flag senha_temporaria=true, que obriga
+// a troca no primeiro acesso (ver TrocarSenhaObrigatoria.tsx no frontend).
 //
 // Quem pode chamar: admin cria qualquer papel; coordenador só pode criar
 // 'gestor' (líder), e nesse caso o coordenador_id do novo líder é sempre o
@@ -20,12 +20,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-/** Senha aleatória de 12 caracteres (letras maiúsculas/minúsculas, números e símbolo), única por usuário. */
-function gerarSenhaInicial(): string {
-  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
-  const bytes = crypto.getRandomValues(new Uint32Array(12));
-  return Array.from(bytes, (b) => alfabeto[b % alfabeto.length]).join("");
-}
+/** Senha inicial fixa — sem envio de e-mail, quem cria repassa por fora (WhatsApp, verbal etc.). */
+const SENHA_INICIAL = "Mudar@123";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -111,12 +107,11 @@ Deno.serve(async (req: Request) => {
     db: { schema: "tlp_presenca" },
   });
 
-  // 1. Cria o usuário já com senha aleatória (sem e-mail de convite) — o
+  // 1. Cria o usuário já com a senha inicial fixa (sem e-mail de convite) — o
   // próprio usuário troca no primeiro acesso (senha_temporaria, ver passo 2).
-  const senhaInicial = gerarSenhaInicial();
   const { data: novoUsuario, error: erroCriacao } = await supabaseAdmin.auth.admin.createUser({
     email: payload.email,
-    password: senhaInicial,
+    password: SENHA_INICIAL,
     email_confirm: true,
     user_metadata: { nome: payload.nome },
   });
@@ -153,5 +148,5 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return json({ ok: true, usuario_id: novoUsuario.user.id, senha_inicial: senhaInicial });
+  return json({ ok: true, usuario_id: novoUsuario.user.id, senha_inicial: SENHA_INICIAL });
 });

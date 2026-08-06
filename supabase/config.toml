@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.admin-criar-usuario]
 verify_jwt = true
+
+[functions.admin-redefinir-senha]
+verify_jwt = true
