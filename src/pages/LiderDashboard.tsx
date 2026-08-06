@@ -119,6 +119,7 @@ export function LiderDashboard() {
                         <StatusActionMenu
                           nome={row.colaborador_nome ?? "Colaborador"}
                           statusAtual={row.status}
+                          pedirConfirmacao
                           onAprovar={() =>
                             aplicarEventoStatusDia(row, () =>
                               statusDiaService.aplicarEvento(row, { tipo: "APROVAR" })

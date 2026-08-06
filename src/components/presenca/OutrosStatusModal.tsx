@@ -34,7 +34,7 @@ export function OutrosStatusModal({ nome, onConfirmar, onFechar }: OutrosStatusM
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[2000] flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="outros-status-titulo"
