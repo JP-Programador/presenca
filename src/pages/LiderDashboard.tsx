@@ -61,6 +61,22 @@ export function LiderDashboard() {
     if (usuario) carregar();
   }, [usuario]);
 
+  // Atualiza os dados sozinho a cada 1 min, sem precisar de F5 — não mostra o
+  // spinner de carregamento pra não interromper quem está usando a tela.
+  useEffect(() => {
+    if (!usuario) return;
+    const intervalo = setInterval(() => {
+      statusDiaService
+        .listarStatusDia(hojeISO())
+        .then(setStatusDoDia)
+        .catch(() => {});
+      listarMapaOperacional(hojeISO())
+        .then(setPontosMapa)
+        .catch(() => {});
+    }, 60_000);
+    return () => clearInterval(intervalo);
+  }, [usuario]);
+
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
     const pendentes = statusDoDia.filter((s) => s.status === "PENDENTE").length;

@@ -143,25 +143,31 @@ Deno.serve(async (req: Request) => {
   const colaborador = encontrados[0];
 
   // 2.1. Uma foto de "entrada" (presença) por colaborador por dia — os demais
-  // tipos (intervalo/saída) não têm esse limite.
+  // tipos (intervalo/saída) não têm esse limite. Olha o status_dia ATUAL, não
+  // se já existe algum registro de entrada hoje: se o líder rejeitou o
+  // check-in anterior, o status_dia volta pra FALTA/FOLGA e o colaborador
+  // pode tentar de novo — só bloqueia quando ainda há uma entrada pendente
+  // de aprovação ou já aprovada (PENDENTE/PRESENTE).
   if (tipo === "entrada") {
     const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-    const { data: jaRegistrouHoje, error: duplicidadeError } = await supabase
-      .from("registros_presenca")
-      .select("id")
+    const { data: statusDiaAtual, error: statusDiaError } = await supabase
+      .from("status_dia")
+      .select("status")
       .eq("colaborador_id", colaborador.id)
-      .eq("tipo", "entrada")
       .eq("data_referencia", hojeSp)
       .maybeSingle();
 
-    if (duplicidadeError) {
-      return json({ error: "erro_consulta", mensagem: duplicidadeError.message }, 500);
+    if (statusDiaError) {
+      return json({ error: "erro_consulta", mensagem: statusDiaError.message }, 500);
     }
-    if (jaRegistrouHoje) {
+    if (statusDiaAtual?.status === "PENDENTE" || statusDiaAtual?.status === "PRESENTE") {
       return json(
         {
           error: "presenca_ja_registrada",
-          mensagem: "Você já registrou sua presença hoje.",
+          mensagem:
+            statusDiaAtual.status === "PENDENTE"
+              ? "Sua presença de hoje já foi registrada e está aguardando aprovação."
+              : "Sua presença de hoje já foi aprovada.",
         },
         409
       );

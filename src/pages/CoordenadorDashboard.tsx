@@ -35,8 +35,8 @@ export function CoordenadorDashboard() {
   const [erro, setErro] = useState<string | null>(null);
   const [buscaNome, setBuscaNome] = useState("");
 
-  async function carregar() {
-    setCarregandoDados(true);
+  async function carregar(silencioso = false) {
+    if (!silencioso) setCarregandoDados(true);
     setErro(null);
     try {
       const trintaDiasAtras = new Date();
@@ -56,7 +56,7 @@ export function CoordenadorDashboard() {
     } catch {
       setErro("Não foi possível carregar os dados do dashboard.");
     } finally {
-      setCarregandoDados(false);
+      if (!silencioso) setCarregandoDados(false);
     }
   }
 
@@ -72,6 +72,15 @@ export function CoordenadorDashboard() {
 
   useEffect(() => {
     if (usuario) carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario]);
+
+  // Atualiza os dados sozinho a cada 1 min, sem precisar de F5 — silencioso
+  // (não reexibe o spinner de carregamento por cima da tela).
+  useEffect(() => {
+    if (!usuario) return;
+    const intervalo = setInterval(() => carregar(true), 60_000);
+    return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario]);
 
