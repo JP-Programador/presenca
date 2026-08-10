@@ -25,7 +25,9 @@ export function CoordenadorDashboard() {
   // Papel (admin/coordenador) já validado por <RequireRole> na definição das rotas.
   const { usuario, sair } = useAuth();
   const [ranking, setRanking] = useState<SlaLider[]>([]);
+  const [dataPendencias, setDataPendencias] = useState(hojeISO());
   const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);
+  const [carregandoPendencias, setCarregandoPendencias] = useState(true);
   const [dataMapa, setDataMapa] = useState(hojeISO());
   const [pontosMapa, setPontosMapa] = useState<PontoMapaOperacional[]>([]);
   const [carregandoMapa, setCarregandoMapa] = useState(true);
@@ -41,14 +43,12 @@ export function CoordenadorDashboard() {
     try {
       const trintaDiasAtras = new Date();
       trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-      const [rank, statusDia, sla, totalEscalados] = await Promise.all([
+      const [rank, sla, totalEscalados] = await Promise.all([
         listarRankingLideres(),
-        statusDiaService.listarStatusDia(hojeISO()),
         listarSlaStatusDia(trintaDiasAtras.toISOString().slice(0, 10)),
         contarColaboradoresAtivos(),
       ]);
       setRanking(rank);
-      setStatusDoDia(statusDia);
       setDecisoesSla(sla);
       setEscalados(totalEscalados);
     } catch {
@@ -66,6 +66,17 @@ export function CoordenadorDashboard() {
       setErro("Não foi possível carregar o mapa operacional.");
     } finally {
       if (!silencioso) setCarregandoMapa(false);
+    }
+  }
+
+  async function carregarPendencias(silencioso = false) {
+    if (!silencioso) setCarregandoPendencias(true);
+    try {
+      setStatusDoDia(await statusDiaService.listarStatusDia(dataPendencias));
+    } catch {
+      setErro("Não foi possível carregar as pendências.");
+    } finally {
+      if (!silencioso) setCarregandoPendencias(false);
     }
   }
 
@@ -89,19 +100,25 @@ export function CoordenadorDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario, dataMapa]);
 
+  useEffect(() => {
+    if (usuario) carregarPendencias();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, dataPendencias]);
+
   // Atualiza os dados sozinho a cada 1 min, sem precisar de F5 — silencioso
-  // (não reexibe o spinner de carregamento por cima da tela). O mapa só
-  // atualiza sozinho quando a data selecionada é hoje — olhar um dia
-  // anterior não muda com o tempo.
+  // (não reexibe o spinner de carregamento por cima da tela). Mapa e
+  // pendências só atualizam sozinhos quando a data selecionada é hoje —
+  // olhar um dia anterior não muda com o tempo.
   useEffect(() => {
     if (!usuario) return;
     const intervalo = setInterval(() => {
       carregar(true);
       if (dataMapa === hojeISO()) carregarMapa(true);
+      if (dataPendencias === hojeISO()) carregarPendencias(true);
     }, 60_000);
     return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, dataMapa]);
+  }, [usuario, dataMapa, dataPendencias]);
 
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
@@ -148,6 +165,16 @@ export function CoordenadorDashboard() {
         {erro && (
           <div className="mb-4">
             <Alert variant="danger">{erro}</Alert>
+          </div>
+        )}
+
+        {dataPendencias !== hojeISO() && (
+          <div className="mb-3">
+            <Alert variant="warning">
+              Os cards abaixo e o painel de pendências estão mostrando{" "}
+              {new Date(`${dataPendencias}T00:00:00`).toLocaleDateString("pt-BR")}, não hoje — mude a data em
+              "Pendências e cobrança" pra voltar.
+            </Alert>
           </div>
         )}
 
@@ -218,6 +245,18 @@ export function CoordenadorDashboard() {
 
         <Card className="mb-6">
           <CardHeader>
+            <h2 className="text-sm font-semibold text-ink dark:text-white">Geral — nome e status</h2>
+            <p className="text-xs text-ink/50 dark:text-white/50">
+              Consulte qualquer dia, filtrando por status e nome. A data é a mesma do Mapa operacional, acima.
+            </p>
+          </CardHeader>
+          <CardBody>
+            <TabelaGeralStatus data={dataMapa} onDataChange={setDataMapa} />
+          </CardBody>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
             <h2 className="text-sm font-semibold text-ink dark:text-white">Exportações</h2>
             <p className="text-xs text-ink/50 dark:text-white/50">Relatórios de presença, pendências, rejeições e auditoria.</p>
           </CardHeader>
@@ -227,24 +266,24 @@ export function CoordenadorDashboard() {
         </Card>
 
         <Card className="mb-6">
-          <CardHeader>
-            <h2 className="text-sm font-semibold text-ink dark:text-white">Geral — nome e status</h2>
-            <p className="text-xs text-ink/50 dark:text-white/50">
-              Consulte qualquer dia, filtrando por status e nome.
-            </p>
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-ink dark:text-white">Pendências e cobrança</h2>
+              <p className="text-xs text-ink/50 dark:text-white/50">
+                Status do dia de todos os colaboradores, todas as filiais. Escolha uma data anterior se precisar
+                corrigir o status de um dia passado.
+              </p>
+            </div>
+            <input
+              type="date"
+              value={dataPendencias}
+              max={hojeISO()}
+              onChange={(e) => setDataPendencias(e.target.value)}
+              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+            />
           </CardHeader>
           <CardBody>
-            <TabelaGeralStatus />
-          </CardBody>
-        </Card>
-
-        <Card className="mb-6">
-          <CardHeader>
-            <h2 className="text-sm font-semibold text-ink dark:text-white">Pendências e cobrança</h2>
-            <p className="text-xs text-ink/50 dark:text-white/50">Status do dia de todos os colaboradores, todas as filiais.</p>
-          </CardHeader>
-          <CardBody>
-            {carregandoDados ? (
+            {carregandoPendencias ? (
               <div className="flex justify-center py-8">
                 <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>

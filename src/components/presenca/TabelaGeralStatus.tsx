@@ -26,6 +26,12 @@ function IconeTabela() {
   );
 }
 
+interface TabelaGeralStatusProps {
+  /** Controla a data de fora (ex.: sincronizada com o seletor do Mapa operacional). Omitir = data só interna, começando em hoje. */
+  data?: string;
+  onDataChange?: (data: string) => void;
+}
+
 /**
  * Tabela geral (Módulo — pedido de revisão): nome + status, com filtro de
  * dia, status e nome. Complementa o PendenciasPainel (que só olha o dia
@@ -36,9 +42,11 @@ function IconeTabela() {
  * era) e "grade" (resumo mensal em cartão-ponto, uma coluna por dia do mês,
  * com sigla do status em cada célula).
  */
-export function TabelaGeralStatus() {
+export function TabelaGeralStatus({ data: dataControlada, onDataChange }: TabelaGeralStatusProps) {
   const [visualizacao, setVisualizacao] = useState<Visualizacao>("lista");
-  const [data, setData] = useState(hojeISO());
+  const [dataInterna, setDataInterna] = useState(hojeISO());
+  const data = dataControlada ?? dataInterna;
+  const setData = onDataChange ?? setDataInterna;
   const [status, setStatus] = useState<StatusDia | "">("");
   const [nome, setNome] = useState("");
   const [linhas, setLinhas] = useState<StatusDiaRegistro[]>([]);
