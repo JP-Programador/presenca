@@ -135,7 +135,7 @@ export function TecnicoCheckin() {
                 )}
               </div>
               <Alert variant="warning">
-                Atenção: este é apenas um sistema interno de chamada da operação. Ele não substitui o app de ponto
+                Observação: este é apenas um sistema interno de chamada da operação. Ele não substitui o app de ponto
                 Ahgora — é obrigatório continuar registrando todas as batidas de ponto normalmente pelo Ahgora.
               </Alert>
               <Button fullWidth onClick={registrarNovamente}>
