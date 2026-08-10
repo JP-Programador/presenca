@@ -4,10 +4,8 @@ import { NavPaineis } from "@/components/layout/NavPaineis";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { MetricCard } from "@/components/ui/MetricCard";
-import { ExportButtons } from "@/components/ui/ExportButtons";
 import { PresenceMap } from "@/components/presenca/PresenceMap";
 import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
-import { RankingLideres } from "@/components/presenca/RankingLideres";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
@@ -28,7 +26,9 @@ export function CoordenadorDashboard() {
   const { usuario, sair } = useAuth();
   const [ranking, setRanking] = useState<SlaLider[]>([]);
   const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);
+  const [dataMapa, setDataMapa] = useState(hojeISO());
   const [pontosMapa, setPontosMapa] = useState<PontoMapaOperacional[]>([]);
+  const [carregandoMapa, setCarregandoMapa] = useState(true);
   const [decisoesSla, setDecisoesSla] = useState<SlaStatusDia[]>([]);
   const [escalados, setEscalados] = useState(0);
   const [carregandoDados, setCarregandoDados] = useState(true);
@@ -41,22 +41,31 @@ export function CoordenadorDashboard() {
     try {
       const trintaDiasAtras = new Date();
       trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-      const [rank, statusDia, pontos, sla, totalEscalados] = await Promise.all([
+      const [rank, statusDia, sla, totalEscalados] = await Promise.all([
         listarRankingLideres(),
         statusDiaService.listarStatusDia(hojeISO()),
-        listarMapaOperacional(hojeISO()),
         listarSlaStatusDia(trintaDiasAtras.toISOString().slice(0, 10)),
         contarColaboradoresAtivos(),
       ]);
       setRanking(rank);
       setStatusDoDia(statusDia);
-      setPontosMapa(pontos);
       setDecisoesSla(sla);
       setEscalados(totalEscalados);
     } catch {
       setErro("Não foi possível carregar os dados do dashboard.");
     } finally {
       if (!silencioso) setCarregandoDados(false);
+    }
+  }
+
+  async function carregarMapa(silencioso = false) {
+    if (!silencioso) setCarregandoMapa(true);
+    try {
+      setPontosMapa(await listarMapaOperacional(dataMapa));
+    } catch {
+      setErro("Não foi possível carregar o mapa operacional.");
+    } finally {
+      if (!silencioso) setCarregandoMapa(false);
     }
   }
 
@@ -75,14 +84,24 @@ export function CoordenadorDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario]);
 
+  useEffect(() => {
+    if (usuario) carregarMapa();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, dataMapa]);
+
   // Atualiza os dados sozinho a cada 1 min, sem precisar de F5 — silencioso
-  // (não reexibe o spinner de carregamento por cima da tela).
+  // (não reexibe o spinner de carregamento por cima da tela). O mapa só
+  // atualiza sozinho quando a data selecionada é hoje — olhar um dia
+  // anterior não muda com o tempo.
   useEffect(() => {
     if (!usuario) return;
-    const intervalo = setInterval(() => carregar(true), 60_000);
+    const intervalo = setInterval(() => {
+      carregar(true);
+      if (dataMapa === hojeISO()) carregarMapa(true);
+    }, 60_000);
     return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario]);
+  }, [usuario, dataMapa]);
 
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
@@ -172,29 +191,38 @@ export function CoordenadorDashboard() {
         </div>
 
         <Card className="mb-6">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa operacional</h2>
+              <p className="text-xs text-ink/50 dark:text-white/50">
+                Status do dia de cada colaborador, com localização quando disponível. A busca por nome é a mesma do
+                painel de pendências, mais abaixo.
+              </p>
+            </div>
+            <input
+              type="date"
+              value={dataMapa}
+              max={hojeISO()}
+              onChange={(e) => setDataMapa(e.target.value)}
+              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+            />
+          </CardHeader>
+          <CardBody>
+            {carregandoMapa ? (
+              <MapaCarregando />
+            ) : (
+              <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} />
+            )}
+          </CardBody>
+        </Card>
+
+        <Card className="mb-6">
           <CardHeader>
             <h2 className="text-sm font-semibold text-ink dark:text-white">Exportações</h2>
             <p className="text-xs text-ink/50 dark:text-white/50">Relatórios de presença, pendências, rejeições e auditoria.</p>
           </CardHeader>
           <CardBody>
             <RelatoriosExport />
-          </CardBody>
-        </Card>
-
-        <Card className="mb-6">
-          <CardHeader>
-            <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa operacional (hoje)</h2>
-            <p className="text-xs text-ink/50 dark:text-white/50">
-              Status do dia de cada colaborador, com localização quando disponível. A busca por nome é a mesma do
-              painel de pendências, mais abaixo.
-            </p>
-          </CardHeader>
-          <CardBody>
-            {carregandoDados ? (
-              <MapaCarregando />
-            ) : (
-              <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} />
-            )}
           </CardBody>
         </Card>
 
@@ -257,38 +285,6 @@ export function CoordenadorDashboard() {
                       )
                 }
               />
-            )}
-          </CardBody>
-        </Card>
-
-        <Card className="mb-6">
-          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-ink dark:text-white">Ranking de líderes</h2>
-              <p className="text-xs text-ink/50 dark:text-white/50">Ordenado por % de decisões dentro do SLA de 2h.</p>
-            </div>
-            <ExportButtons
-              dados={ranking}
-              nomeBase="ranking-lideres"
-              colunas={[
-                { chave: "gestor_nome", titulo: "Líder" },
-                { chave: "filial_home_nome", titulo: "Filial" },
-                { chave: "total_decisoes", titulo: "Decisões" },
-                { chave: "total_aprovadas", titulo: "Aprovadas" },
-                { chave: "total_rejeitadas", titulo: "Rejeitadas" },
-                { chave: "tempo_medio_min", titulo: "Tempo médio (min)" },
-                { chave: "pct_dentro_sla", titulo: "% dentro do SLA" },
-                { chave: "pendencias_atuais", titulo: "Pendências atuais" },
-              ]}
-            />
-          </CardHeader>
-          <CardBody>
-            {carregandoDados ? (
-              <div className="flex justify-center py-8">
-                <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : (
-              <RankingLideres dados={ranking} />
             )}
           </CardBody>
         </Card>

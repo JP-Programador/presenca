@@ -106,7 +106,7 @@ export function TecnicoMarcacoes() {
                 <Input
                   id="codigo-filial"
                   label="Código da filial"
-                  placeholder="Ex.: 1768"
+                  placeholder="Ex.: 24"
                   value={codigoFilial}
                   onChange={(e) => setCodigoFilial(e.target.value)}
                   autoComplete="off"

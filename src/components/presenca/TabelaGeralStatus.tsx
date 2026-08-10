@@ -56,6 +56,15 @@ export function TabelaGeralStatus() {
       .finally(() => setCarregando(false));
   }, [data, visualizacao]);
 
+  // Atualiza sozinho a cada 1 min (silencioso, sem reexibir o spinner).
+  useEffect(() => {
+    if (visualizacao !== "lista") return;
+    const intervalo = setInterval(() => {
+      statusDiaService.listarStatusDia(data).then(setLinhas).catch(() => {});
+    }, 60_000);
+    return () => clearInterval(intervalo);
+  }, [data, visualizacao]);
+
   const filtradas = useMemo(() => {
     const termo = nome.trim().toLowerCase();
     return linhas.filter((l) => {
