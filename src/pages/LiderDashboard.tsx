@@ -28,6 +28,12 @@ export function LiderDashboard() {
   const [erro, setErro] = useState<string | null>(null);
   const [buscaNome, setBuscaNome] = useState("");
 
+  // Aba "Geral": data selecionável (não fixa em hoje) e o mapa dessa aba
+  // segue a mesma data escolhida na tabela.
+  const [dataGeral, setDataGeral] = useState(hojeISO());
+  const [pontosMapaGeral, setPontosMapaGeral] = useState<PontoMapaOperacional[]>([]);
+  const [carregandoMapaGeral, setCarregandoMapaGeral] = useState(true);
+
   async function carregar() {
     setCarregandoLista(true);
     setErro(null);
@@ -57,12 +63,29 @@ export function LiderDashboard() {
     setStatusDoDia((prev) => prev.map((item) => (item.id === row.id ? { ...item, ...atualizado } : item)));
   }
 
+  async function carregarMapaGeral(silencioso = false) {
+    if (!silencioso) setCarregandoMapaGeral(true);
+    try {
+      setPontosMapaGeral(await listarMapaOperacional(dataGeral));
+    } catch {
+      setErro("Não foi possível carregar o mapa.");
+    } finally {
+      if (!silencioso) setCarregandoMapaGeral(false);
+    }
+  }
+
   useEffect(() => {
     if (usuario) carregar();
   }, [usuario]);
 
+  useEffect(() => {
+    if (usuario) carregarMapaGeral();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, dataGeral]);
+
   // Atualiza os dados sozinho a cada 1 min, sem precisar de F5 — não mostra o
-  // spinner de carregamento pra não interromper quem está usando a tela.
+  // spinner de carregamento pra não interromper quem está usando a tela. O
+  // mapa da aba Geral só atualiza sozinho quando a data selecionada é hoje.
   useEffect(() => {
     if (!usuario) return;
     const intervalo = setInterval(() => {
@@ -73,9 +96,11 @@ export function LiderDashboard() {
       listarMapaOperacional(hojeISO())
         .then(setPontosMapa)
         .catch(() => {});
+      if (dataGeral === hojeISO()) carregarMapaGeral(true);
     }, 60_000);
     return () => clearInterval(intervalo);
-  }, [usuario]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, dataGeral]);
 
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
@@ -203,7 +228,16 @@ export function LiderDashboard() {
               />
             )}
 
-            {aba === "geral" && <TabelaGeralStatus />}
+            {aba === "geral" && (
+              <>
+                <MiniMapCard
+                  titulo="Mapa da filial"
+                  pontos={pontosMapaGeral}
+                  carregando={carregandoMapaGeral}
+                />
+                <TabelaGeralStatus data={dataGeral} onDataChange={setDataGeral} />
+              </>
+            )}
           </div>
         )}
       </main>
