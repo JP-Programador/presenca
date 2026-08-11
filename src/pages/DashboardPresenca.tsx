@@ -2,24 +2,34 @@ import { useEffect, useMemo, useState } from "react";
 import { BrandHeader } from "@/components/layout/BrandHeader";
 import { NavPaineis } from "@/components/layout/NavPaineis";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { useAuth } from "@/providers/AuthProvider";
 import { hojeISO, intervaloDeDatas } from "@/lib/calendario";
 import * as statusDiaService from "@/services/statusDiaService";
 import { listarColaboradores } from "@/services/colaboradoresService";
-import { listarHorariosEntrada, listarRegistrosAtrasados } from "@/services/dashboardPresencaService";
-import { listarSlaStatusDia, ranquearPorFilial } from "@/services/slaService";
+import { listarLideres, type PessoaSimples } from "@/services/coordenacaoService";
+import {
+  listarHorariosEntrada,
+  listarRegistrosAtrasados,
+  listarRegistrosEntradaPeriodo,
+} from "@/services/dashboardPresencaService";
+import { exportarCSV } from "@/services/exportService";
 import { AnalyticsMensal } from "@/components/presenca/AnalyticsMensal";
 import {
   calcularAcumuladoPeriodo,
   calcularTopFaltas,
   calcularTopAtrasos,
+  calcularSerieDiaria,
   calcularSerieFaltasAtestados,
+  montarLinhasDetalhadas,
   mapearLideres,
   calcularRankingPorLider,
   META_PLANTA_DISPONIVEL,
+  type PontoDiario,
   type PontoFaltasAtestados,
   type RankingLiderPlanta,
+  type LinhaDetalhada,
 } from "@/lib/analytics";
 import type { StatusDiaRegistro } from "@/types/status";
 import type { Colaborador, RegistroPresenca } from "@/types/domain";
@@ -59,21 +69,16 @@ function inicioDoPeriodo(periodo: PeriodoGlobal): string {
   return formatarISO(d);
 }
 
-interface LinhaFilial {
-  filial_id: string;
-  filial_nome: string;
-  escalados: number;
-  presentesTotal: number;
-  faltasTotal: number;
-  slaMedioMin: number | null;
-}
-
 export function DashboardPresenca() {
   // Papel (admin/auditor/coordenador/gestor) já validado por <RequireRole> na definição das rotas.
   const { usuario, sair } = useAuth();
+  const ehLider = usuario?.perfil === "gestor";
+
   const [periodo, setPeriodo] = useState<PeriodoGlobal>("semana");
   const [personalizadoInicio, setPersonalizadoInicio] = useState(inicioDoPeriodo("30dias"));
   const [personalizadoFim, setPersonalizadoFim] = useState(hojeISO());
+  const [liderFiltro, setLiderFiltro] = useState<string>("todos");
+  const [colaboradorFiltro, setColaboradorFiltro] = useState<string>("todos");
 
   const { inicio, fim } = useMemo(() => {
     if (periodo === "personalizado") {
@@ -84,12 +89,12 @@ export function DashboardPresenca() {
     return { inicio: inicioDoPeriodo(periodo), fim: hojeISO() };
   }, [periodo, personalizadoInicio, personalizadoFim]);
 
-  const [statusPeriodo, setStatusPeriodo] = useState<StatusDiaRegistro[]>([]);
-  const [registrosAtrasados, setRegistrosAtrasados] = useState<RegistroPresenca[]>([]);
+  const [statusPeriodoTodos, setStatusPeriodoTodos] = useState<StatusDiaRegistro[]>([]);
+  const [registrosAtrasadosTodos, setRegistrosAtrasadosTodos] = useState<RegistroPresenca[]>([]);
+  const [registrosEntradaTodos, setRegistrosEntradaTodos] = useState<RegistroPresenca[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [lideresDisponiveis, setLideresDisponiveis] = useState<PessoaSimples[]>([]);
   const [horariosEntrada, setHorariosEntrada] = useState<string[]>([]);
-  const [slaMedioPorFilial, setSlaMedioPorFilial] = useState<Map<string, number>>(new Map());
-  const [slaMedioGeral, setSlaMedioGeral] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
@@ -100,23 +105,20 @@ export function DashboardPresenca() {
     if (!silencioso) setCarregando(true);
     setErro(null);
     try {
-      const [statusDia, atrasados, colabs, horarios, decisoesSla] = await Promise.all([
+      const [statusDia, atrasados, entradas, colabs, lideres, horarios] = await Promise.all([
         statusDiaService.listarStatusDiaPeriodo(inicio, fim),
         listarRegistrosAtrasados(inicio, fim),
+        listarRegistrosEntradaPeriodo(inicio, fim),
         listarColaboradores(),
+        ehLider ? Promise.resolve<PessoaSimples[]>([]) : listarLideres(),
         listarHorariosEntrada(hojeISO()),
-        listarSlaStatusDia(inicio, fim),
       ]);
-      setStatusPeriodo(statusDia);
-      setRegistrosAtrasados(atrasados);
+      setStatusPeriodoTodos(statusDia);
+      setRegistrosAtrasadosTodos(atrasados);
+      setRegistrosEntradaTodos(entradas);
       setColaboradores(colabs);
+      setLideresDisponiveis(lideres);
       setHorariosEntrada(horarios);
-      setSlaMedioPorFilial(new Map(ranquearPorFilial(decisoesSla).map((f) => [f.filial_id, f.tempo_medio_min])));
-      setSlaMedioGeral(
-        decisoesSla.length > 0
-          ? Math.round((decisoesSla.reduce((s, d) => s + d.minutos, 0) / decisoesSla.length) * 10) / 10
-          : null
-      );
       setUltimaAtualizacao(new Date());
     } catch {
       setErro("Não foi possível carregar o painel.");
@@ -137,7 +139,38 @@ export function DashboardPresenca() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario, inicio, fim]);
 
-  const escalados = useMemo(() => colaboradores.filter((c) => c.ativo).length, [colaboradores]);
+  // Filtro em cascata: líder -> colaborador. Pra líder logado, os dados já
+  // vêm restritos à própria equipe via RLS — o filtro de líder nem
+  // aparece pra ele (fica travado no próprio nome); só o de colaborador
+  // continua útil, dentro do time dele.
+  const colaboradoresDoLider = useMemo(
+    () => (liderFiltro === "todos" ? colaboradores : colaboradores.filter((c) => c.lider_id === liderFiltro)),
+    [colaboradores, liderFiltro]
+  );
+
+  const colaboradoresVisiveis = useMemo(
+    () =>
+      colaboradorFiltro === "todos"
+        ? colaboradoresDoLider
+        : colaboradoresDoLider.filter((c) => c.id === colaboradorFiltro),
+    [colaboradoresDoLider, colaboradorFiltro]
+  );
+
+  const idsVisiveis = useMemo(() => new Set(colaboradoresVisiveis.map((c) => c.id)), [colaboradoresVisiveis]);
+  const escalados = useMemo(() => colaboradoresVisiveis.filter((c) => c.ativo).length, [colaboradoresVisiveis]);
+
+  const statusPeriodo = useMemo(
+    () => statusPeriodoTodos.filter((s) => idsVisiveis.has(s.colaborador_id)),
+    [statusPeriodoTodos, idsVisiveis]
+  );
+  const registrosAtrasados = useMemo(
+    () => registrosAtrasadosTodos.filter((r) => idsVisiveis.has(r.colaborador_id)),
+    [registrosAtrasadosTodos, idsVisiveis]
+  );
+  const registrosEntrada = useMemo(
+    () => registrosEntradaTodos.filter((r) => idsVisiveis.has(r.colaborador_id)),
+    [registrosEntradaTodos, idsVisiveis]
+  );
 
   const acumulado = useMemo(
     () => calcularAcumuladoPeriodo(statusPeriodo, registrosAtrasados, escalados, inicio, fim),
@@ -163,9 +196,19 @@ export function DashboardPresenca() {
   );
   const topEngajamento = useMemo(() => rankingLideres.slice(0, 5), [rankingLideres]);
 
+  const serieDiaria = useMemo<PontoDiario[]>(
+    () => calcularSerieDiaria(statusPeriodo, escalados, inicio, fim),
+    [statusPeriodo, escalados, inicio, fim]
+  );
+
   const serieFaltasAtestados = useMemo<PontoFaltasAtestados[]>(
     () => calcularSerieFaltasAtestados(statusPeriodo, inicio, fim),
     [statusPeriodo, inicio, fim]
+  );
+
+  const linhasDetalhadas = useMemo<LinhaDetalhada[]>(
+    () => montarLinhasDetalhadas(statusPeriodo, registrosEntrada, mapaLideres),
+    [statusPeriodo, registrosEntrada, mapaLideres]
   );
 
   const contagemPorHora = useMemo(() => {
@@ -180,47 +223,30 @@ export function DashboardPresenca() {
 
   const maxPorHora = useMemo(() => Math.max(1, ...Array.from(contagemPorHora.values())), [contagemPorHora]);
 
-  const linhasPorFilial = useMemo<LinhaFilial[]>(() => {
-    const mapa = new Map<string, LinhaFilial>();
-
-    for (const c of colaboradores) {
-      if (!c.ativo) continue;
-      const linha = mapa.get(c.filial_id) ?? {
-        filial_id: c.filial_id,
-        filial_nome: c.filial_nome ?? "—",
-        escalados: 0,
-        presentesTotal: 0,
-        faltasTotal: 0,
-        slaMedioMin: null,
-      };
-      linha.escalados += 1;
-      mapa.set(c.filial_id, linha);
-    }
-
-    for (const s of statusPeriodo) {
-      const linha = mapa.get(s.filial_id) ?? {
-        filial_id: s.filial_id,
-        filial_nome: s.filial_nome ?? "—",
-        escalados: 0,
-        presentesTotal: 0,
-        faltasTotal: 0,
-        slaMedioMin: null,
-      };
-      if (s.status === "PRESENTE") linha.presentesTotal += 1;
-      if (s.status === "FALTA") linha.faltasTotal += 1;
-      mapa.set(s.filial_id, linha);
-    }
-
-    for (const linha of mapa.values()) {
-      linha.slaMedioMin = slaMedioPorFilial.get(linha.filial_id) ?? null;
-    }
-
-    return Array.from(mapa.values()).sort((a, b) => a.filial_nome.localeCompare(b.filial_nome));
-  }, [colaboradores, statusPeriodo, slaMedioPorFilial]);
+  function exportarDetalhado() {
+    exportarCSV(
+      linhasDetalhadas.map((l) => ({
+        data: l.data,
+        colaborador: l.colaborador_nome,
+        lider: l.lider_nome,
+        status: STATUS_LABEL[l.status] ?? l.status,
+        horario_entrada: l.horarioEntrada ?? "",
+        minutos_atraso: l.minutosAtraso ?? "",
+      })),
+      [
+        { chave: "data", titulo: "Data" },
+        { chave: "colaborador", titulo: "Colaborador" },
+        { chave: "lider", titulo: "Líder direto" },
+        { chave: "status", titulo: "Status" },
+        { chave: "horario_entrada", titulo: "Horário de entrada" },
+        { chave: "minutos_atraso", titulo: "Minutos de atraso" },
+      ],
+      `presenca-detalhado-${inicio}-a-${fim}.csv`
+    );
+  }
 
   if (!usuario) return null; // narrowing de tipo; na prática nunca alcançado (ver RequireRole)
 
-  const ehLider = usuario.perfil === "gestor";
   const periodoLabel = PERIODOS_GLOBAIS.find((p) => p.chave === periodo)?.label ?? "";
 
   return (
@@ -232,51 +258,89 @@ export function DashboardPresenca() {
       />
 
       <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex gap-1 rounded-md border border-ink/15 bg-white p-1 dark:border-white/15 dark:bg-[#242424]">
-              {PERIODOS_GLOBAIS.map((p) => (
-                <button
-                  key={p.chave}
-                  type="button"
-                  onClick={() => setPeriodo(p.chave)}
-                  className={[
-                    "rounded px-2.5 py-1.5 text-xs font-semibold transition-colors",
-                    periodo === p.chave
-                      ? "bg-primary text-white"
-                      : "text-ink/50 hover:bg-surface dark:text-white/50 dark:hover:bg-white/5",
-                  ].join(" ")}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            {periodo === "personalizado" && (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="date"
-                  value={personalizadoInicio}
-                  max={hojeISO()}
-                  onChange={(e) => setPersonalizadoInicio(e.target.value)}
-                  className="h-9 rounded-md border border-ink/15 bg-white px-2 text-xs text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
-                />
-                <span className="text-xs text-ink/40 dark:text-white/40">até</span>
-                <input
-                  type="date"
-                  value={personalizadoFim}
-                  max={hojeISO()}
-                  onChange={(e) => setPersonalizadoFim(e.target.value)}
-                  className="h-9 rounded-md border border-ink/15 bg-white px-2 text-xs text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
-                />
+        <div className="mb-4 flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-1 rounded-md border border-ink/15 bg-white p-1 dark:border-white/15 dark:bg-[#242424]">
+                {PERIODOS_GLOBAIS.map((p) => (
+                  <button
+                    key={p.chave}
+                    type="button"
+                    onClick={() => setPeriodo(p.chave)}
+                    className={[
+                      "rounded px-2.5 py-1.5 text-xs font-semibold transition-colors",
+                      periodo === p.chave
+                        ? "bg-primary text-white"
+                        : "text-ink/50 hover:bg-surface dark:text-white/50 dark:hover:bg-white/5",
+                    ].join(" ")}
+                  >
+                    {p.label}
+                  </button>
+                ))}
               </div>
-            )}
+              {periodo === "personalizado" && (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="date"
+                    value={personalizadoInicio}
+                    max={hojeISO()}
+                    onChange={(e) => setPersonalizadoInicio(e.target.value)}
+                    className="h-9 rounded-md border border-ink/15 bg-white px-2 text-xs text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+                  />
+                  <span className="text-xs text-ink/40 dark:text-white/40">até</span>
+                  <input
+                    type="date"
+                    value={personalizadoFim}
+                    max={hojeISO()}
+                    onChange={(e) => setPersonalizadoFim(e.target.value)}
+                    className="h-9 rounded-md border border-ink/15 bg-white px-2 text-xs text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+                  />
+                </div>
+              )}
+            </div>
+            <span className="text-xs text-ink/40 dark:text-white/40">
+              {ultimaAtualizacao
+                ? `Última atualização: ${ultimaAtualizacao.toLocaleTimeString("pt-BR")}`
+                : "Carregando..."}{" "}
+              · atualiza sozinho a cada 30s
+            </span>
           </div>
-          <span className="text-xs text-ink/40 dark:text-white/40">
-            {ultimaAtualizacao
-              ? `Última atualização: ${ultimaAtualizacao.toLocaleTimeString("pt-BR")}`
-              : "Carregando..."}{" "}
-            · atualiza sozinho a cada 30s
-          </span>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {ehLider ? (
+              <span className="rounded-md border border-ink/15 bg-white px-3 py-2 text-xs font-semibold text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white">
+                Líder: {usuario.nome}
+              </span>
+            ) : (
+              <select
+                value={liderFiltro}
+                onChange={(e) => {
+                  setLiderFiltro(e.target.value);
+                  setColaboradorFiltro("todos");
+                }}
+                className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+              >
+                <option value="todos">Todos os líderes</option>
+                {lideresDisponiveis.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.nome}
+                  </option>
+                ))}
+              </select>
+            )}
+            <select
+              value={colaboradorFiltro}
+              onChange={(e) => setColaboradorFiltro(e.target.value)}
+              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+            >
+              <option value="todos">Todos os colaboradores</option>
+              {colaboradoresDoLider.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {erro && (
@@ -291,7 +355,7 @@ export function DashboardPresenca() {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <MetricCardSimples
                 label="Faltas no período"
                 valor={String(acumulado.totalFaltas)}
@@ -316,12 +380,6 @@ export function DashboardPresenca() {
                 cor="text-warning"
                 tooltip="Check-ins de entrada registrados como atrasado."
               />
-              <MetricCardSimples
-                label="SLA médio de ajustes"
-                valor={slaMedioGeral != null ? `${slaMedioGeral} min` : "—"}
-                cor="text-ink dark:text-white"
-                tooltip="Tempo médio que os líderes levam para decidir uma pendência, no período."
-              />
             </div>
 
             <div>
@@ -333,6 +391,22 @@ export function DashboardPresenca() {
                 {!ehLider && <PainelEngajamentoLideres dados={topEngajamento} />}
               </div>
             </div>
+
+            <Card>
+              <CardHeader>
+                <h2 className="text-sm font-semibold text-ink dark:text-white">Evolução diária da planta ativa</h2>
+                <p className="text-xs text-ink/50 dark:text-white/50">
+                  Quantidade absoluta de presentes por dia (linha tracejada = efetivo escalado atual: {escalados}).
+                </p>
+              </CardHeader>
+              <CardBody>
+                {serieDiaria.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-ink/50 dark:text-white/50">Sem dados nesse período.</p>
+                ) : (
+                  <GraficoPlantaAtiva serie={serieDiaria} escalados={escalados} />
+                )}
+              </CardBody>
+            </Card>
 
             <Card>
               <CardHeader>
@@ -389,51 +463,52 @@ export function DashboardPresenca() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <h2 className="text-sm font-semibold text-ink dark:text-white">
-                  {ehLider ? "Sua filial" : "Comparativo por filial"}
-                </h2>
-                <p className="text-xs text-ink/50 dark:text-white/50">
-                  Escalados, presença, faltas e SLA médio de aprovação — {periodoLabel.toLowerCase()}.
-                </p>
+              <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-semibold text-ink dark:text-white">Detalhado do período</h2>
+                  <p className="text-xs text-ink/50 dark:text-white/50">
+                    Uma linha por colaborador/dia — {linhasDetalhadas.length} registro(s).
+                  </p>
+                </div>
+                <Button variant="secondary" size="md" onClick={exportarDetalhado} disabled={linhasDetalhadas.length === 0}>
+                  Exportar CSV
+                </Button>
               </CardHeader>
               <CardBody>
-                {linhasPorFilial.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-ink/50 dark:text-white/50">Nenhum dado disponível.</p>
+                {linhasDetalhadas.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-ink/50 dark:text-white/50">Nenhum dado nesse período.</p>
                 ) : (
-                  <div className="overflow-x-auto rounded-lg border border-ink/10 dark:border-white/10">
-                    <table className="w-full min-w-[520px] text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-ink/10 bg-surface text-xs uppercase tracking-wide text-ink/50 dark:border-white/10 dark:bg-white/5 dark:text-white/50">
-                          <th className="px-4 py-2">Filial</th>
-                          <th className="px-4 py-2 text-right">Escalados</th>
-                          <th className="px-4 py-2 text-right" title="Soma de presenças no período">
-                            Presenças (soma)
-                          </th>
-                          <th className="px-4 py-2 text-right">% disponível (médio)</th>
-                          <th className="px-4 py-2 text-right">Faltas</th>
-                          <th className="px-4 py-2 text-right">SLA médio</th>
+                  <div className="max-h-96 overflow-y-auto overflow-x-auto rounded-lg border border-ink/10 dark:border-white/10">
+                    <table className="w-full min-w-[620px] text-left text-sm">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="border-b border-ink/10 bg-surface text-xs uppercase tracking-wide text-ink/50 dark:border-white/10 dark:bg-[#1A1A1A] dark:text-white/50">
+                          <th className="px-3 py-2">Data</th>
+                          <th className="px-3 py-2">Colaborador</th>
+                          <th className="px-3 py-2">Líder direto</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2 text-right">Entrada</th>
+                          <th className="px-3 py-2 text-right">Atraso (min)</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {linhasPorFilial.map((l) => {
-                          const pct =
-                            l.escalados > 0 && diasConsiderados > 0
-                              ? Math.round((l.presentesTotal / (l.escalados * diasConsiderados)) * 100)
-                              : 0;
-                          return (
-                            <tr key={l.filial_id} className="border-b border-ink/5 last:border-0 dark:border-white/5">
-                              <td className="px-4 py-2.5 font-medium text-ink dark:text-white">{l.filial_nome}</td>
-                              <td className="px-4 py-2.5 text-right text-ink/70 dark:text-white/70">{l.escalados}</td>
-                              <td className="px-4 py-2.5 text-right text-[#2E7D32]">{l.presentesTotal}</td>
-                              <td className="px-4 py-2.5 text-right font-semibold text-ink dark:text-white">{pct}%</td>
-                              <td className="px-4 py-2.5 text-right text-danger">{l.faltasTotal}</td>
-                              <td className="px-4 py-2.5 text-right text-ink/70 dark:text-white/70">
-                                {l.slaMedioMin != null ? `${l.slaMedioMin} min` : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                      <tbody className="bg-white dark:bg-[#242424]">
+                        {linhasDetalhadas.map((l, i) => (
+                          <tr key={i} className="border-b border-ink/5 last:border-0 dark:border-white/5">
+                            <td className="px-3 py-2 text-ink/70 dark:text-white/70">
+                              {new Date(`${l.data}T00:00:00`).toLocaleDateString("pt-BR")}
+                            </td>
+                            <td className="px-3 py-2 font-medium text-ink dark:text-white">{l.colaborador_nome}</td>
+                            <td className="px-3 py-2 text-ink/70 dark:text-white/70">{l.lider_nome}</td>
+                            <td className="px-3 py-2 text-ink/70 dark:text-white/70">
+                              {STATUS_LABEL[l.status] ?? l.status}
+                            </td>
+                            <td className="px-3 py-2 text-right text-ink/70 dark:text-white/70">
+                              {l.horarioEntrada ?? "—"}
+                            </td>
+                            <td className={["px-3 py-2 text-right", (l.minutosAtraso ?? 0) > 0 ? "text-warning font-semibold" : "text-ink/40 dark:text-white/40"].join(" ")}>
+                              {l.minutosAtraso ?? "—"}
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -448,6 +523,15 @@ export function DashboardPresenca() {
     </div>
   );
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  PRESENTE: "Presente",
+  FALTA: "Falta",
+  ATESTADO: "Atestado",
+  FOLGA: "Folga",
+  PENDENTE: "Pendente",
+  OUTROS: "Outros",
+};
 
 function MetricCardSimples({
   label,
@@ -591,6 +675,36 @@ function PainelEngajamentoLideres({ dados }: { dados: RankingLiderPlanta[] }) {
         )}
       </CardBody>
     </Card>
+  );
+}
+
+function GraficoPlantaAtiva({ serie, escalados }: { serie: PontoDiario[]; escalados: number }) {
+  const largura = 700;
+  const altura = 160;
+  const max = Math.max(escalados, 1, ...serie.map((p) => p.presentes));
+  const passoX = serie.length > 1 ? largura / (serie.length - 1) : 0;
+
+  const pontos = serie.map((p, i) => ({ x: i * passoX, y: altura - (p.presentes / max) * altura, p }));
+  const linha = pontos.map((pt) => `${pt.x},${pt.y}`).join(" ");
+  const yEscalados = altura - (escalados / max) * altura;
+
+  return (
+    <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${largura} ${altura + 24}`} className="h-48 w-full min-w-[500px]">
+        <line x1={0} y1={yEscalados} x2={largura} y2={yEscalados} stroke="#8A6200" strokeWidth={1} strokeDasharray="4 3" />
+        <text x={largura - 2} y={yEscalados - 4} textAnchor="end" fontSize={10} fill="#8A6200">
+          Escalados ({escalados})
+        </text>
+        <polyline points={linha} fill="none" strokeWidth={2} className="stroke-primary" />
+        {pontos.map((pt, i) => (
+          <circle key={i} cx={pt.x} cy={pt.y} r={2.5} className="fill-primary">
+            <title>
+              {pt.p.data}: {pt.p.presentes} presentes
+            </title>
+          </circle>
+        ))}
+      </svg>
+    </div>
   );
 }
 

@@ -217,6 +217,16 @@ export function calcularTopFaltas(
     .slice(0, limite);
 }
 
+/** Minutos entre horário previsto e horário registrado de um check-in — null se não há horário previsto (sem escala cadastrada). */
+export function minutosAtraso(registro: Pick<RegistroPresenca, "horario_previsto" | "horario_registrado">): number | null {
+  if (!registro.horario_previsto) return null;
+  const [h, m] = registro.horario_previsto.split(":").map(Number);
+  const previsto = new Date(registro.horario_registrado);
+  previsto.setHours(h, m, 0, 0);
+  const registrado = new Date(registro.horario_registrado);
+  return Math.max(0, Math.round((registrado.getTime() - previsto.getTime()) / 60000));
+}
+
 export interface TopColaboradorAtraso {
   colaborador_id: string;
   nome: string;
@@ -245,12 +255,8 @@ export function calcularTopAtrasos(registros: RegistroPresenca[], limite = 5): T
       comHorarioPrevisto: 0,
     };
     atual.ocorrencias += 1;
-    if (r.horario_previsto) {
-      const [h, m] = r.horario_previsto.split(":").map(Number);
-      const previsto = new Date(r.horario_registrado);
-      previsto.setHours(h, m, 0, 0);
-      const registrado = new Date(r.horario_registrado);
-      const diffMin = Math.max(0, Math.round((registrado.getTime() - previsto.getTime()) / 60000));
+    const diffMin = minutosAtraso(r);
+    if (diffMin != null) {
       atual.somaMinutos += diffMin;
       atual.comHorarioPrevisto += 1;
     }
@@ -294,4 +300,42 @@ export function calcularSerieFaltasAtestados(
     faltas: faltasPorDia.get(data) ?? 0,
     atestados: atestadosPorDia.get(data) ?? 0,
   }));
+}
+
+export interface LinhaDetalhada {
+  data: string;
+  colaborador_nome: string;
+  lider_nome: string;
+  status: string;
+  horarioEntrada: string | null;
+  minutosAtraso: number | null;
+}
+
+/** Linha a linha (data × colaborador) do período, pra tabela compacta de exportação. */
+export function montarLinhasDetalhadas(
+  statusPeriodo: StatusDiaRegistro[],
+  registrosEntrada: RegistroPresenca[],
+  mapaLideres: MapaLider
+): LinhaDetalhada[] {
+  const entradaPorChave = new Map<string, RegistroPresenca>();
+  for (const r of registrosEntrada) {
+    entradaPorChave.set(`${r.colaborador_id}:${r.data_referencia}`, r);
+  }
+
+  return statusPeriodo
+    .map((s) => {
+      const registro = entradaPorChave.get(`${s.colaborador_id}:${s.data_referencia}`);
+      const lider = mapaLideres.colaboradorParaLider.get(s.colaborador_id);
+      return {
+        data: s.data_referencia,
+        colaborador_nome: s.colaborador_nome ?? "—",
+        lider_nome: lider?.lider_nome ?? "—",
+        status: s.status,
+        horarioEntrada: registro
+          ? new Date(registro.horario_registrado).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+          : null,
+        minutosAtraso: registro ? minutosAtraso(registro) : null,
+      };
+    })
+    .sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : a.colaborador_nome.localeCompare(b.colaborador_nome)));
 }

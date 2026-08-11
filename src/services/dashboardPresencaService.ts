@@ -13,6 +13,15 @@ export async function listarHorariosEntrada(dataISO: string): Promise<string[]> 
   return (data ?? []).map((r) => r.horario_registrado as string);
 }
 
+type LinhaRegistroBruta = Omit<RegistroPresenca, "colaborador_nome" | "filial_nome" | "colaborador_matricula"> & {
+  colaboradores: { nome: string } | null;
+  filiais: { nome: string } | null;
+};
+
+function mapearRegistro(row: LinhaRegistroBruta): RegistroPresenca {
+  return { ...row, colaborador_nome: row.colaboradores?.nome, filial_nome: row.filiais?.nome };
+}
+
 /** Registros de entrada marcados como atrasado num período — base do ranking de atrasos. */
 export async function listarRegistrosAtrasados(inicioISO: string, fimISO: string): Promise<RegistroPresenca[]> {
   const { data, error } = await supabase
@@ -26,15 +35,20 @@ export async function listarRegistrosAtrasados(inicioISO: string, fimISO: string
     .lte("data_referencia", fimISO);
 
   if (error) throw error;
+  return ((data ?? []) as unknown as LinhaRegistroBruta[]).map(mapearRegistro);
+}
 
-  type LinhaBruta = Omit<RegistroPresenca, "colaborador_nome" | "filial_nome" | "colaborador_matricula"> & {
-    colaboradores: { nome: string } | null;
-    filiais: { nome: string } | null;
-  };
+/** Todos os registros de entrada num período (presente + atrasado) — base da tabela detalhada de exportação. */
+export async function listarRegistrosEntradaPeriodo(inicioISO: string, fimISO: string): Promise<RegistroPresenca[]> {
+  const { data, error } = await supabase
+    .from("registros_presenca")
+    .select(
+      "id, colaborador_id, filial_id, tipo, status, data_referencia, horario_previsto, horario_registrado, colaboradores(nome), filiais(nome)"
+    )
+    .eq("tipo", "entrada")
+    .gte("data_referencia", inicioISO)
+    .lte("data_referencia", fimISO);
 
-  return ((data ?? []) as unknown as LinhaBruta[]).map((row) => ({
-    ...row,
-    colaborador_nome: row.colaboradores?.nome,
-    filial_nome: row.filiais?.nome,
-  }));
+  if (error) throw error;
+  return ((data ?? []) as unknown as LinhaRegistroBruta[]).map(mapearRegistro);
 }
