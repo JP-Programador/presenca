@@ -6,12 +6,15 @@ const VISAO_GLOBAL: PerfilAcesso[] = ["admin", "auditor", "coordenador"];
 const AUDITORIA: PerfilAcesso[] = ["admin", "auditor"];
 const GESTAO_USUARIOS: PerfilAcesso[] = ["admin", "coordenador"];
 const GESTAO_COLABORADORES: PerfilAcesso[] = ["admin", "coordenador", "gestor"];
+const DASHBOARD_PRESENCA: PerfilAcesso[] = ["admin", "auditor", "coordenador", "gestor"];
 
 /**
  * Links de navegação entre os painéis administrativos + botão sair,
  * mostrados conforme a hierarquia: coordenação para quem tem visão global
  * (admin, auditor, coordenador); auditoria exclusiva de admin/auditor;
- * usuários para admin/coordenador; colaboradores para gestor/coordenador/admin.
+ * usuários para admin/coordenador; colaboradores para gestor/coordenador/admin;
+ * dashboard de presença (gráficos/comparativo) para todo mundo acima de
+ * colaborador — escopado pela própria hierarquia via RLS.
  */
 export function NavPaineis({
   perfil,
@@ -19,7 +22,7 @@ export function NavPaineis({
   onSair,
 }: {
   perfil: PerfilAcesso;
-  atual: "lider" | "coordenador" | "auditoria" | "usuarios" | "colaboradores";
+  atual: "lider" | "coordenador" | "auditoria" | "usuarios" | "colaboradores" | "dashboard-presenca";
   onSair: () => void;
 }) {
   const temVisaoGlobal = VISAO_GLOBAL.includes(perfil);
@@ -29,6 +32,11 @@ export function NavPaineis({
       {atual !== "coordenador" && temVisaoGlobal && (
         <Link to="/coordenador" className="text-sm font-semibold text-primary hover:underline">
           Coordenação
+        </Link>
+      )}
+      {atual !== "dashboard-presenca" && DASHBOARD_PRESENCA.includes(perfil) && (
+        <Link to="/dashboard-presenca" className="text-sm font-semibold text-primary hover:underline">
+          Dashboard
         </Link>
       )}
       {atual !== "auditoria" && AUDITORIA.includes(perfil) && (

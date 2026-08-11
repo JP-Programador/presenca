@@ -58,6 +58,33 @@ export function ranquearPorLider(decisoes: SlaStatusDia[]): RankingSlaLider[] {
   return Array.from(mapa.values()).sort((a, b) => a.tempo_medio_min - b.tempo_medio_min);
 }
 
+export interface RankingSlaFilial {
+  filial_id: string;
+  filial_nome: string;
+  total_decisoes: number;
+  tempo_medio_min: number;
+}
+
+/** Agrupa as decisões por filial (client-side — mesmo raciocínio de ranquearPorLider). */
+export function ranquearPorFilial(decisoes: SlaStatusDia[]): RankingSlaFilial[] {
+  const mapa = new Map<string, RankingSlaFilial>();
+
+  for (const d of decisoes) {
+    const atual = mapa.get(d.filial_id) ?? {
+      filial_id: d.filial_id,
+      filial_nome: d.filial_nome ?? "—",
+      total_decisoes: 0,
+      tempo_medio_min: 0,
+    };
+    const somaAnterior = atual.tempo_medio_min * atual.total_decisoes;
+    atual.total_decisoes += 1;
+    atual.tempo_medio_min = Math.round(((somaAnterior + d.minutos) / atual.total_decisoes) * 10) / 10;
+    mapa.set(d.filial_id, atual);
+  }
+
+  return Array.from(mapa.values()).sort((a, b) => a.filial_nome.localeCompare(b.filial_nome));
+}
+
 /** Média de tempo de decisão por dia (para gráfico/tabela de evolução diária). */
 export function mediaDiaria(decisoes: SlaStatusDia[]): { data: string; media_min: number; total: number }[] {
   const mapa = new Map<string, { soma: number; total: number }>();

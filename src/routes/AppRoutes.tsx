@@ -24,6 +24,9 @@ const UsuariosGestao = lazy(() =>
 const ColaboradoresGestao = lazy(() =>
   import("@/pages/ColaboradoresGestao").then((m) => ({ default: m.ColaboradoresGestao }))
 );
+const DashboardPresenca = lazy(() =>
+  import("@/pages/DashboardPresenca").then((m) => ({ default: m.DashboardPresenca }))
+);
 
 // Hierarquia: admin > coordenador > gestor > colaborador, com auditor no
 // mesmo nível de LEITURA do admin (mas sem nenhuma escrita).
@@ -35,6 +38,9 @@ const PAPEIS_VISAO_GLOBAL = ["admin", "auditor", "coordenador"] as const;
 const PAPEIS_AUDITORIA = ["admin", "auditor"] as const;
 const PAPEIS_GESTAO_USUARIOS = ["admin", "coordenador"] as const;
 const PAPEIS_GESTAO_COLABORADORES = ["admin", "coordenador", "gestor"] as const;
+// Dashboard de presença (gráficos/comparativo): todo mundo acima de colaborador —
+// escopado pela própria hierarquia via RLS (líder só vê a equipe dele).
+const PAPEIS_DASHBOARD_PRESENCA = ["admin", "auditor", "coordenador", "gestor"] as const;
 
 export function AppRoutes() {
   return (
@@ -98,6 +104,18 @@ export function AppRoutes() {
           <RequireRole roles={[...PAPEIS_GESTAO_COLABORADORES]} fallback="/lider">
             <Suspense fallback={<LoadingScreen />}>
               <ColaboradoresGestao />
+            </Suspense>
+          </RequireRole>
+        }
+      />
+
+      {/* Dashboard de presença — gráficos e comparativo, sem acesso de colaborador comum */}
+      <Route
+        path="/dashboard-presenca"
+        element={
+          <RequireRole roles={[...PAPEIS_DASHBOARD_PRESENCA]} fallback="/lider">
+            <Suspense fallback={<LoadingScreen />}>
+              <DashboardPresenca />
             </Suspense>
           </RequireRole>
         }
