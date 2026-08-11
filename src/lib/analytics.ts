@@ -3,7 +3,7 @@
 // colaboradores) e devolvem as séries prontas pra cada gráfico/card.
 
 import { intervaloDeDatas } from "@/lib/calendario";
-import type { Colaborador } from "@/types/domain";
+import type { Colaborador, RegistroPresenca } from "@/types/domain";
 import type { StatusDiaRegistro } from "@/types/status";
 
 export const META_PLANTA_DISPONIVEL = 90;
@@ -68,9 +68,11 @@ export interface RankingLiderPlanta {
   pctMedio: number;
   faltas: number;
   atestados: number;
+  /** % de dias-pessoa em falta/atestado sobre o total escalado — quanto maior, pior. */
+  taxaAbsenteismo: number;
 }
 
-/** Ranking por líder: % médio de planta disponível no período + faltas/atestados acumulados (ofensores). */
+/** Ranking por líder: % médio de planta disponível no período + faltas/atestados acumulados (ofensores). Ordenado do melhor pro pior engajamento. */
 export function calcularRankingPorLider(
   statusMes: StatusDiaRegistro[],
   mapaLideres: MapaLider,
@@ -99,7 +101,9 @@ export function calcularRankingPorLider(
       const time = mapaLideres.colaboradoresPorLider.get(lider_id) ?? 1;
       const escaladoDias = time * totalDias;
       const pctMedio = escaladoDias > 0 ? Math.round((v.presencasDias / escaladoDias) * 100) : 0;
-      return { lider_id, lider_nome: v.lider_nome, pctMedio, faltas: v.faltas, atestados: v.atestados };
+      const taxaAbsenteismo =
+        escaladoDias > 0 ? Math.round(((v.faltas + v.atestados) / escaladoDias) * 1000) / 10 : 0;
+      return { lider_id, lider_nome: v.lider_nome, pctMedio, faltas: v.faltas, atestados: v.atestados, taxaAbsenteismo };
     })
     .sort((a, b) => b.pctMedio - a.pctMedio);
 }
@@ -143,4 +147,151 @@ export function calcularHeatmapFaltas(
   }
 
   return { celulas, maxFaltas, nomesDias: NOMES_DIA_SEMANA };
+}
+
+// =========================================================
+// Visão acumulada de período (semana/mês/30 dias/personalizado) —
+// cards consolidados, top ofensores e evolução faltas x atestados.
+// =========================================================
+
+export interface AcumuladoPeriodo {
+  totalFaltas: number;
+  totalAtestados: number;
+  totalAtrasos: number;
+  pctMedioPlantaDisponivel: number;
+}
+
+/** Cards consolidados do período: faltas, atestados, atrasos e % médio de planta disponível. */
+export function calcularAcumuladoPeriodo(
+  statusPeriodo: StatusDiaRegistro[],
+  registrosAtrasados: RegistroPresenca[],
+  escalados: number,
+  inicioISO: string,
+  fimISO: string
+): AcumuladoPeriodo {
+  const serie = calcularSerieDiaria(statusPeriodo, escalados, inicioISO, fimISO);
+  const pctMedio = mediaSimples(serie.map((p) => p.pct));
+  return {
+    totalFaltas: statusPeriodo.filter((s) => s.status === "FALTA").length,
+    totalAtestados: statusPeriodo.filter((s) => s.status === "ATESTADO").length,
+    totalAtrasos: registrosAtrasados.length,
+    pctMedioPlantaDisponivel: pctMedio,
+  };
+}
+
+function mediaSimples(valores: number[]): number {
+  if (valores.length === 0) return 0;
+  return Math.round((valores.reduce((s, v) => s + v, 0) / valores.length) * 10) / 10;
+}
+
+export interface TopColaboradorFaltas {
+  colaborador_id: string;
+  nome: string;
+  filial_nome: string;
+  lider_nome: string;
+  faltas: number;
+}
+
+/** Top N colaboradores com mais faltas no período. */
+export function calcularTopFaltas(
+  statusPeriodo: StatusDiaRegistro[],
+  mapaLideres: MapaLider,
+  limite = 5
+): TopColaboradorFaltas[] {
+  const acc = new Map<string, TopColaboradorFaltas>();
+  for (const s of statusPeriodo) {
+    if (s.status !== "FALTA") continue;
+    const lider = mapaLideres.colaboradorParaLider.get(s.colaborador_id);
+    const atual = acc.get(s.colaborador_id) ?? {
+      colaborador_id: s.colaborador_id,
+      nome: s.colaborador_nome ?? "—",
+      filial_nome: s.filial_nome ?? "—",
+      lider_nome: lider?.lider_nome ?? "—",
+      faltas: 0,
+    };
+    atual.faltas += 1;
+    acc.set(s.colaborador_id, atual);
+  }
+  return Array.from(acc.values())
+    .sort((a, b) => b.faltas - a.faltas)
+    .slice(0, limite);
+}
+
+export interface TopColaboradorAtraso {
+  colaborador_id: string;
+  nome: string;
+  filial_nome: string;
+  ocorrencias: number;
+  mediaMinutos: number | null;
+}
+
+/** Top N colaboradores com mais registros de atraso no período (registros_presenca.status='atrasado'). */
+export function calcularTopAtrasos(registros: RegistroPresenca[], limite = 5): TopColaboradorAtraso[] {
+  interface Acc {
+    nome: string;
+    filial_nome: string;
+    ocorrencias: number;
+    somaMinutos: number;
+    comHorarioPrevisto: number;
+  }
+  const acc = new Map<string, Acc>();
+
+  for (const r of registros) {
+    const atual = acc.get(r.colaborador_id) ?? {
+      nome: r.colaborador_nome ?? "—",
+      filial_nome: r.filial_nome ?? "—",
+      ocorrencias: 0,
+      somaMinutos: 0,
+      comHorarioPrevisto: 0,
+    };
+    atual.ocorrencias += 1;
+    if (r.horario_previsto) {
+      const [h, m] = r.horario_previsto.split(":").map(Number);
+      const previsto = new Date(r.horario_registrado);
+      previsto.setHours(h, m, 0, 0);
+      const registrado = new Date(r.horario_registrado);
+      const diffMin = Math.max(0, Math.round((registrado.getTime() - previsto.getTime()) / 60000));
+      atual.somaMinutos += diffMin;
+      atual.comHorarioPrevisto += 1;
+    }
+    acc.set(r.colaborador_id, atual);
+  }
+
+  return Array.from(acc.entries())
+    .map(([colaborador_id, v]) => ({
+      colaborador_id,
+      nome: v.nome,
+      filial_nome: v.filial_nome,
+      ocorrencias: v.ocorrencias,
+      mediaMinutos: v.comHorarioPrevisto > 0 ? Math.round(v.somaMinutos / v.comHorarioPrevisto) : null,
+    }))
+    .sort((a, b) => b.ocorrencias - a.ocorrencias)
+    .slice(0, limite);
+}
+
+export interface PontoFaltasAtestados {
+  data: string;
+  faltas: number;
+  atestados: number;
+}
+
+/** Série diária de Faltas x Atestados no período, para o gráfico de evolução. */
+export function calcularSerieFaltasAtestados(
+  statusPeriodo: StatusDiaRegistro[],
+  inicioISO: string,
+  fimISO: string
+): PontoFaltasAtestados[] {
+  const dias = intervaloDeDatas(inicioISO, fimISO);
+  const faltasPorDia = new Map<string, number>();
+  const atestadosPorDia = new Map<string, number>();
+  for (const s of statusPeriodo) {
+    if (s.status === "FALTA") faltasPorDia.set(s.data_referencia, (faltasPorDia.get(s.data_referencia) ?? 0) + 1);
+    if (s.status === "ATESTADO")
+      atestadosPorDia.set(s.data_referencia, (atestadosPorDia.get(s.data_referencia) ?? 0) + 1);
+  }
+  return dias.map((data) => ({
+    data,
+    faltas: faltasPorDia.get(data) ?? 0,
+    atestados: atestadosPorDia.get(data) ?? 0,
+  }));
 }
