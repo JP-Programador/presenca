@@ -201,6 +201,7 @@ export function LiderDashboard() {
                         <StatusActionMenu
                           nome={row.colaborador_nome ?? "Colaborador"}
                           statusAtual={row.status}
+                          motivoOutrosAtual={row.motivo_outros}
                           pedirConfirmacao
                           onAprovar={() =>
                             aplicarEventoStatusDia(row, () =>
@@ -222,6 +223,22 @@ export function LiderDashboard() {
                               })
                             )
                           }
+                          onAplicarFerias={async (dataInicio, dataFim, observacao, sobrescrever) => {
+                            const preview = await statusDiaService.aplicarFerias(
+                              row.colaborador_id,
+                              dataInicio,
+                              dataFim,
+                              observacao,
+                              sobrescrever
+                            );
+                            if (preview.some((p) => p.aplicado)) await carregar();
+                            return preview;
+                          }}
+                          onCancelarFerias={async () => {
+                            const { inicio, fim } = statusDiaService.janelaCancelamentoFerias(row.data_referencia);
+                            await statusDiaService.cancelarFerias(row.colaborador_id, inicio, fim);
+                            await carregar();
+                          }}
                         />
                       )
                 }

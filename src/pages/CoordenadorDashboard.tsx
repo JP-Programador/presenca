@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { PresenceMap } from "@/components/presenca/PresenceMap";
 import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
+import { AlertasFeriasCard } from "@/components/presenca/AlertasFeriasCard";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
 import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
@@ -213,6 +214,8 @@ export function CoordenadorDashboard() {
           />
         </div>
 
+        <AlertasFeriasCard />
+
         <div className="mb-6">
           <PendenteLancarCard itens={statusDoDia} />
         </div>
@@ -299,6 +302,7 @@ export function CoordenadorDashboard() {
                         <StatusActionMenu
                           nome={row.colaborador_nome ?? "Colaborador"}
                           statusAtual={row.status}
+                          motivoOutrosAtual={row.motivo_outros}
                           pedirConfirmacao
                           onAprovar={() =>
                             aplicarEventoStatusDia(row, () =>
@@ -320,6 +324,22 @@ export function CoordenadorDashboard() {
                               })
                             )
                           }
+                          onAplicarFerias={async (dataInicio, dataFim, observacao, sobrescrever) => {
+                            const preview = await statusDiaService.aplicarFerias(
+                              row.colaborador_id,
+                              dataInicio,
+                              dataFim,
+                              observacao,
+                              sobrescrever
+                            );
+                            if (preview.some((p) => p.aplicado)) await carregarPendencias();
+                            return preview;
+                          }}
+                          onCancelarFerias={async () => {
+                            const { inicio, fim } = statusDiaService.janelaCancelamentoFerias(row.data_referencia);
+                            await statusDiaService.cancelarFerias(row.colaborador_id, inicio, fim);
+                            await carregarPendencias();
+                          }}
                         />
                       )
                 }

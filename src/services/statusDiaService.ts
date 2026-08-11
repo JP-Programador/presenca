@@ -114,3 +114,59 @@ export async function aplicarEvento(
   if (error) throw error;
   return data as StatusDiaRegistro;
 }
+
+export interface PreviewFerias {
+  data_referencia: string;
+  conflito: boolean;
+  aplicado: boolean;
+}
+
+/**
+ * Aplica férias num intervalo de datas. Sem sobrescrever=true, se algum dia
+ * já tiver registro (check-in real ou status manual diferente do padrão),
+ * nada é aplicado — o retorno traz o preview com os dias em conflito pro
+ * front perguntar se deve sobrescrever.
+ */
+export async function aplicarFerias(
+  colaboradorId: string,
+  dataInicio: string,
+  dataFim: string,
+  observacao: string,
+  sobrescrever = false
+): Promise<PreviewFerias[]> {
+  const { data, error } = await supabase.rpc("aplicar_ferias", {
+    p_colaborador_id: colaboradorId,
+    p_data_inicio: dataInicio,
+    p_data_fim: dataFim,
+    p_observacao: observacao || null,
+    p_sobrescrever: sobrescrever,
+  });
+  if (error) throw error;
+  return data as PreviewFerias[];
+}
+
+/**
+ * Janela de datas usada pra "Cancelar férias" a partir de um único dia
+ * visível na tela: como o período completo não fica guardado em nenhum
+ * lugar (só cada dia sabe que está em Férias), abrange uma folga generosa
+ * em torno do dia clicado — cancelar_ferias só mexe nos dias que
+ * realmente estão marcados como Férias dentro dela, o resto é ignorado.
+ */
+export function janelaCancelamentoFerias(dataReferenciaISO: string): { inicio: string; fim: string } {
+  const base = new Date(`${dataReferenciaISO}T00:00:00`);
+  const inicio = new Date(base);
+  inicio.setDate(inicio.getDate() - 60);
+  const fim = new Date(base);
+  fim.setDate(fim.getDate() + 60);
+  return { inicio: inicio.toISOString().slice(0, 10), fim: fim.toISOString().slice(0, 10) };
+}
+
+/** Cancela férias num intervalo — reverte os dias marcados como Outros/Férias pro status padrão (Falta/Folga). */
+export async function cancelarFerias(colaboradorId: string, dataInicio: string, dataFim: string): Promise<void> {
+  const { error } = await supabase.rpc("cancelar_ferias", {
+    p_colaborador_id: colaboradorId,
+    p_data_inicio: dataInicio,
+    p_data_fim: dataFim,
+  });
+  if (error) throw error;
+}
