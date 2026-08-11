@@ -38,8 +38,9 @@ export function FeriasModal({ nome, onAplicar, onConflito, onFechar }: FeriasMod
         return;
       }
       onFechar();
-    } catch {
-      setErro("Não foi possível aplicar as férias. Tente novamente.");
+    } catch (err) {
+      const mensagem = err instanceof Error ? err.message : null;
+      setErro(mensagem || "Não foi possível aplicar as férias. Tente novamente.");
     } finally {
       setEnviando(false);
     }

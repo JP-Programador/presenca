@@ -1,61 +1,13 @@
 -- =========================================================
--- 0045 · Férias em lote (intervalo de datas)
+-- 0046 · Corrige ambiguidade de coluna em aplicar_ferias
 --
--- Reaproveita o modelo existente: status OUTROS + motivo 'Férias' já
--- existiam (0018), o que faltava era um jeito de aplicar isso num
--- intervalo de datas de uma vez, sem o líder precisar marcar dia a dia.
---
--- aplicar_ferias: aplica 'OUTROS'/'Férias' em cada dia do intervalo.
--- Se algum dia já tem um registro (check-in real ou status manual
--- diferente do padrão), NÃO aplica nada nesse primeiro passe — devolve o
--- preview (data_referencia, conflito, aplicado=false) pro front decidir.
--- Chamando de novo com p_sobrescrever=true aplica de fato, registra em
--- audit_log e cria um alerta assíncrono pro coordenador do líder do
--- colaborador (que não está presente na hora pra confirmar).
---
--- cancelar_ferias: reverte o intervalo inteiro pro status padrão do dia
--- (FALTA em dia útil / FOLGA em fim de semana/feriado) — cancelamento é
--- tudo-ou-nada; pra ajustar datas, cancela e lança de novo.
+-- RETURNS TABLE(data_referencia date, ...) cria uma variável implícita
+-- "data_referencia" com escopo na função inteira — colidindo com a coluna
+-- status_dia.data_referencia usada sem alias na 2ª passada da função,
+-- estourando "column reference \"data_referencia\" is ambiguous" (42702)
+-- em toda chamada real (líder/coordenador logado, não só via anon/teste).
 -- =========================================================
 
--- ---------------------------------------------------------
--- Tabela de alertas — genérica, pra este e futuros avisos assíncronos
--- (não existia nenhuma tabela de notificação; pendências hoje são só
--- consulta ao vivo, o que não serve pra avisar quem não está na tela).
--- ---------------------------------------------------------
-create table tlp_presenca.alertas (
-  id             uuid primary key default gen_random_uuid(),
-  tipo           text not null,
-  colaborador_id uuid references tlp_presenca.colaboradores(id) on delete cascade,
-  destinatario_id uuid not null references tlp_presenca.perfis(id) on delete cascade,
-  detalhes       jsonb not null default '{}',
-  lido           boolean not null default false,
-  created_at     timestamptz not null default now()
-);
-
-comment on table tlp_presenca.alertas is
-  'Avisos assíncronos endereçados a um perfil específico (ex.: coordenador avisado de uma sobrescrita de férias que ele não presenciou).';
-
-create index alertas_destinatario_idx on tlp_presenca.alertas (destinatario_id, lido);
-
-alter table tlp_presenca.alertas enable row level security;
-
-create policy "alertas_select_destinatario"
-  on tlp_presenca.alertas for select
-  to authenticated
-  using (destinatario_id = auth.uid() or tlp_presenca.sou_admin());
-
-create policy "alertas_update_destinatario"
-  on tlp_presenca.alertas for update
-  to authenticated
-  using (destinatario_id = auth.uid())
-  with check (destinatario_id = auth.uid());
-
--- Sem policy de insert: só as RPCs security definer (abaixo) escrevem aqui.
-
--- ---------------------------------------------------------
--- aplicar_ferias
--- ---------------------------------------------------------
 create or replace function tlp_presenca.aplicar_ferias(
   p_colaborador_id uuid,
   p_data_inicio date,
@@ -171,45 +123,3 @@ $$;
 
 comment on function tlp_presenca.aplicar_ferias(uuid, date, date, text, boolean) is
   'Aplica status OUTROS/Férias em todos os dias do intervalo. Sem p_sobrescrever, para na primeira passada se houver conflito (registro real ou status manual já existente) e devolve o preview sem aplicar nada — o front decide se relança com p_sobrescrever=true.';
-
--- ---------------------------------------------------------
--- cancelar_ferias — reverte o intervalo inteiro pro status padrão do dia.
--- ---------------------------------------------------------
-create or replace function tlp_presenca.cancelar_ferias(
-  p_colaborador_id uuid,
-  p_data_inicio date,
-  p_data_fim date
-)
-returns void
-language plpgsql
-security definer
-set search_path = tlp_presenca
-as $$
-declare
-  v_data date;
-  v_row tlp_presenca.status_dia;
-begin
-  if not (
-    tlp_presenca.sou_admin()
-    or tlp_presenca.sou_lider_do_colaborador(p_colaborador_id)
-    or (tlp_presenca.sou_coordenador() and tlp_presenca.sou_coordenador_do_colaborador(p_colaborador_id))
-  ) then
-    raise exception 'Sem permissão para cancelar férias deste colaborador';
-  end if;
-
-  for v_data in select generate_series(p_data_inicio, p_data_fim, interval '1 day')::date loop
-    select * into v_row from tlp_presenca.status_dia
-      where colaborador_id = p_colaborador_id and data_referencia = v_data;
-
-    if found and v_row.status = 'OUTROS' and v_row.motivo_outros = 'Férias' then
-      -- p_forcar_status=false faz o servidor recalcular o repouso (FALTA/FOLGA) do dia.
-      perform tlp_presenca.transicionar_status_dia(
-        v_row.id, 'FALTA'::tlp_presenca.status_dia_enum, null, null, null, false
-      );
-    end if;
-  end loop;
-end;
-$$;
-
-comment on function tlp_presenca.cancelar_ferias(uuid, date, date) is
-  'Reverte pro status padrão (FALTA/FOLGA recalculado) todo dia do intervalo que estava marcado como OUTROS/Férias. Cancelamento é tudo-ou-nada; ignora silenciosamente dias fora desse status.';
