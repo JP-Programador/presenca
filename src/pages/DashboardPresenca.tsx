@@ -688,6 +688,8 @@ function GraficoPlantaAtiva({ serie, escalados }: { serie: PontoDiario[]; escala
   const linha = pontos.map((pt) => `${pt.x},${pt.y}`).join(" ");
   const yEscalados = altura - (escalados / max) * altura;
 
+  const mostrarTodasDatas = serie.length <= 15;
+
   return (
     <div className="overflow-x-auto">
       <svg viewBox={`0 0 ${largura} ${altura + 24}`} className="h-48 w-full min-w-[500px]">
@@ -703,6 +705,21 @@ function GraficoPlantaAtiva({ serie, escalados }: { serie: PontoDiario[]; escala
             </title>
           </circle>
         ))}
+        {pontos.map((pt, i) => {
+          if (!mostrarTodasDatas && i % Math.ceil(serie.length / 10) !== 0 && i !== serie.length - 1) return null;
+          return (
+            <text
+              key={`label-${i}`}
+              x={pt.x}
+              y={altura + 16}
+              textAnchor="middle"
+              fontSize={9}
+              className="fill-ink/40 dark:fill-white/40"
+            >
+              {new Date(`${pt.p.data}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+            </text>
+          );
+        })}
       </svg>
     </div>
   );
