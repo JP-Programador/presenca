@@ -35,6 +35,17 @@ function limitesDoMes(mesISO: string): { inicio: string; fim: string } {
   return { inicio, fim };
 }
 
+function mesAnteriorISO(mesISO: string): string {
+  const [ano, mes] = mesISO.split("-").map(Number);
+  const d = new Date(ano, mes - 2, 1); // mes é 1-indexed; -2 volta um mês
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function mediaPct(serie: PontoDiario[]): number | null {
+  if (serie.length === 0) return null;
+  return Math.round((serie.reduce((soma, p) => soma + p.pct, 0) / serie.length) * 10) / 10;
+}
+
 /** Barrinha de progresso simples (usada no card de QVP). */
 function BarraProgresso({ pct, cor }: { pct: number; cor: string }) {
   return (
@@ -52,23 +63,31 @@ function BarraProgresso({ pct, cor }: { pct: number; cor: string }) {
 export function AnalyticsMensal() {
   const [mes, setMes] = useState(mesAtualISO());
   const [statusMes, setStatusMes] = useState<StatusDiaRegistro[]>([]);
+  const [statusMesAnterior, setStatusMesAnterior] = useState<StatusDiaRegistro[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
   const { inicio, fim } = useMemo(() => limitesDoMes(mes), [mes]);
+  const mesAnterior = useMemo(() => mesAnteriorISO(mes), [mes]);
+  const { inicio: inicioAnterior, fim: fimAnterior } = useMemo(() => limitesDoMes(mesAnterior), [mesAnterior]);
 
   useEffect(() => {
     setCarregando(true);
     setErro(null);
-    Promise.all([statusDiaService.listarStatusDiaPeriodo(inicio, fim), listarColaboradores()])
-      .then(([status, colabs]) => {
+    Promise.all([
+      statusDiaService.listarStatusDiaPeriodo(inicio, fim),
+      statusDiaService.listarStatusDiaPeriodo(inicioAnterior, fimAnterior),
+      listarColaboradores(),
+    ])
+      .then(([status, statusAnterior, colabs]) => {
         setStatusMes(status);
+        setStatusMesAnterior(statusAnterior);
         setColaboradores(colabs);
       })
       .catch(() => setErro("Não foi possível carregar o histórico mensal."))
       .finally(() => setCarregando(false));
-  }, [inicio, fim]);
+  }, [inicio, fim, inicioAnterior, fimAnterior]);
 
   const escalados = useMemo(() => colaboradores.filter((c) => c.ativo).length, [colaboradores]);
 
@@ -77,7 +96,19 @@ export function AnalyticsMensal() {
     [statusMes, escalados, inicio, fim]
   );
 
+  const serieAnterior = useMemo<PontoDiario[]>(
+    () => calcularSerieDiaria(statusMesAnterior, escalados, inicioAnterior, fimAnterior),
+    [statusMesAnterior, escalados, inicioAnterior, fimAnterior]
+  );
+
   const qvp = useMemo(() => calcularQVP(serieDiaria), [serieDiaria]);
+
+  const tendencia = useMemo(() => {
+    const atual = mediaPct(serieDiaria);
+    const anterior = mediaPct(serieAnterior);
+    if (atual == null || anterior == null) return null;
+    return Math.round((atual - anterior) * 10) / 10;
+  }, [serieDiaria, serieAnterior]);
 
   const mapaLideres = useMemo(() => mapearLideres(colaboradores), [colaboradores]);
 
@@ -167,6 +198,18 @@ export function AnalyticsMensal() {
                   pct={qvp.diasTotais > 0 ? (qvp.diasNaMeta / qvp.diasTotais) * 100 : 0}
                   cor="bg-primary"
                 />
+                {tendencia != null && (
+                  <p
+                    className={[
+                      "text-xs font-semibold",
+                      tendencia > 0 ? "text-[#2E7D32]" : tendencia < 0 ? "text-danger" : "text-ink/50 dark:text-white/50",
+                    ].join(" ")}
+                    title="Média diária de % planta disponível, mês atual vs anterior"
+                  >
+                    {tendencia > 0 ? "▲" : tendencia < 0 ? "▼" : "—"} {tendencia > 0 ? "+" : ""}
+                    {tendencia}% vs mês anterior
+                  </p>
+                )}
               </CardBody>
             </Card>
           </div>

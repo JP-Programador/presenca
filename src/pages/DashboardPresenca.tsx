@@ -4,7 +4,7 @@ import { NavPaineis } from "@/components/layout/NavPaineis";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { useAuth } from "@/providers/AuthProvider";
-import { hojeISO } from "@/lib/calendario";
+import { hojeISO, intervaloDeDatas } from "@/lib/calendario";
 import * as statusDiaService from "@/services/statusDiaService";
 import { listarColaboradores } from "@/services/colaboradoresService";
 import { listarHorariosEntrada } from "@/services/dashboardPresencaService";
@@ -18,19 +18,40 @@ const INTERVALO_MS = 30_000;
 /** 5h às 23h — faixa de horário que cobre praticamente todos os turnos. */
 const HORAS_GRAFICO = Array.from({ length: 19 }, (_, i) => i + 5);
 
+type Periodo = "hoje" | "7dias" | "mes";
+
+const PERIODOS: { chave: Periodo; label: string }[] = [
+  { chave: "hoje", label: "Hoje" },
+  { chave: "7dias", label: "Últimos 7 dias" },
+  { chave: "mes", label: "Mês atual" },
+];
+
+/** Data de início (YYYY-MM-DD) de um período, terminando sempre em hoje. */
+function inicioDoPeriodo(periodo: Periodo): string {
+  const hoje = new Date();
+  if (periodo === "hoje") return hojeISO();
+  if (periodo === "7dias") {
+    const d = new Date(hoje);
+    d.setDate(d.getDate() - 6);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
 interface LinhaFilial {
   filial_id: string;
   filial_nome: string;
   escalados: number;
-  presentes: number;
-  faltas: number;
+  presentesTotal: number;
+  faltasTotal: number;
   slaMedioMin: number | null;
 }
 
 export function DashboardPresenca() {
   // Papel (admin/auditor/coordenador/gestor) já validado por <RequireRole> na definição das rotas.
   const { usuario, sair } = useAuth();
-  const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);
+  const [periodo, setPeriodo] = useState<Periodo>("hoje");
+  const [statusComparativo, setStatusComparativo] = useState<StatusDiaRegistro[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [horariosEntrada, setHorariosEntrada] = useState<string[]>([]);
   const [slaMedioPorFilial, setSlaMedioPorFilial] = useState<Map<string, number>>(new Map());
@@ -38,19 +59,26 @@ export function DashboardPresenca() {
   const [erro, setErro] = useState<string | null>(null);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
 
+  const diasConsiderados = useMemo(
+    () => intervaloDeDatas(inicioDoPeriodo(periodo), hojeISO()).length,
+    [periodo]
+  );
+
   async function carregar(silencioso = false) {
     if (!silencioso) setCarregando(true);
     setErro(null);
     try {
       const trintaDiasAtras = new Date();
       trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-      const [statusDia, colabs, horarios, decisoesSla] = await Promise.all([
-        statusDiaService.listarStatusDia(hojeISO()),
+      const [statusPeriodo, colabs, horarios, decisoesSla] = await Promise.all([
+        periodo === "hoje"
+          ? statusDiaService.listarStatusDia(hojeISO())
+          : statusDiaService.listarStatusDiaPeriodo(inicioDoPeriodo(periodo), hojeISO()),
         listarColaboradores(),
         listarHorariosEntrada(hojeISO()),
         listarSlaStatusDia(trintaDiasAtras.toISOString().slice(0, 10)),
       ]);
-      setStatusDoDia(statusDia);
+      setStatusComparativo(statusPeriodo);
       setColaboradores(colabs);
       setHorariosEntrada(horarios);
       setSlaMedioPorFilial(new Map(ranquearPorFilial(decisoesSla).map((f) => [f.filial_id, f.tempo_medio_min])));
@@ -65,14 +93,14 @@ export function DashboardPresenca() {
   useEffect(() => {
     if (usuario) carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario]);
+  }, [usuario, periodo]);
 
   useEffect(() => {
     if (!usuario) return;
     const intervalo = setInterval(() => carregar(true), INTERVALO_MS);
     return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario]);
+  }, [usuario, periodo]);
 
   const contagemPorHora = useMemo(() => {
     const mapa = new Map<number, number>();
@@ -95,25 +123,25 @@ export function DashboardPresenca() {
         filial_id: c.filial_id,
         filial_nome: c.filial_nome ?? "—",
         escalados: 0,
-        presentes: 0,
-        faltas: 0,
+        presentesTotal: 0,
+        faltasTotal: 0,
         slaMedioMin: null,
       };
       linha.escalados += 1;
       mapa.set(c.filial_id, linha);
     }
 
-    for (const s of statusDoDia) {
+    for (const s of statusComparativo) {
       const linha = mapa.get(s.filial_id) ?? {
         filial_id: s.filial_id,
         filial_nome: s.filial_nome ?? "—",
         escalados: 0,
-        presentes: 0,
-        faltas: 0,
+        presentesTotal: 0,
+        faltasTotal: 0,
         slaMedioMin: null,
       };
-      if (s.status === "PRESENTE") linha.presentes += 1;
-      if (s.status === "FALTA") linha.faltas += 1;
+      if (s.status === "PRESENTE") linha.presentesTotal += 1;
+      if (s.status === "FALTA") linha.faltasTotal += 1;
       mapa.set(s.filial_id, linha);
     }
 
@@ -122,7 +150,7 @@ export function DashboardPresenca() {
     }
 
     return Array.from(mapa.values()).sort((a, b) => a.filial_nome.localeCompare(b.filial_nome));
-  }, [colaboradores, statusDoDia, slaMedioPorFilial]);
+  }, [colaboradores, statusComparativo, slaMedioPorFilial]);
 
   if (!usuario) return null; // narrowing de tipo; na prática nunca alcançado (ver RequireRole)
 
@@ -197,13 +225,32 @@ export function DashboardPresenca() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <h2 className="text-sm font-semibold text-ink dark:text-white">
-                  {ehLider ? "Sua filial" : "Comparativo por filial"}
-                </h2>
-                <p className="text-xs text-ink/50 dark:text-white/50">
-                  Escalados, presentes, faltas e SLA médio de aprovação (últimos 30 dias).
-                </p>
+              <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-semibold text-ink dark:text-white">
+                    {ehLider ? "Sua filial" : "Comparativo por filial"}
+                  </h2>
+                  <p className="text-xs text-ink/50 dark:text-white/50">
+                    Escalados, presença, faltas e SLA médio de aprovação (SLA sempre últimos 30 dias).
+                  </p>
+                </div>
+                <div className="flex gap-1 rounded-md border border-ink/15 bg-white p-1 dark:border-white/15 dark:bg-[#242424]">
+                  {PERIODOS.map((p) => (
+                    <button
+                      key={p.chave}
+                      type="button"
+                      onClick={() => setPeriodo(p.chave)}
+                      className={[
+                        "rounded px-2.5 py-1.5 text-xs font-semibold transition-colors",
+                        periodo === p.chave
+                          ? "bg-primary text-white"
+                          : "text-ink/50 hover:bg-surface dark:text-white/50 dark:hover:bg-white/5",
+                      ].join(" ")}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </CardHeader>
               <CardBody>
                 {linhasPorFilial.length === 0 ? (
@@ -215,22 +262,27 @@ export function DashboardPresenca() {
                         <tr className="border-b border-ink/10 bg-surface text-xs uppercase tracking-wide text-ink/50 dark:border-white/10 dark:bg-white/5 dark:text-white/50">
                           <th className="px-4 py-2">Filial</th>
                           <th className="px-4 py-2 text-right">Escalados</th>
-                          <th className="px-4 py-2 text-right">Presentes</th>
-                          <th className="px-4 py-2 text-right">% disponível</th>
+                          <th className="px-4 py-2 text-right" title="Soma de presenças no período">
+                            {periodo === "hoje" ? "Presentes" : "Presenças (soma)"}
+                          </th>
+                          <th className="px-4 py-2 text-right">% disponível{periodo !== "hoje" ? " (médio)" : ""}</th>
                           <th className="px-4 py-2 text-right">Faltas</th>
                           <th className="px-4 py-2 text-right">SLA médio</th>
                         </tr>
                       </thead>
                       <tbody>
                         {linhasPorFilial.map((l) => {
-                          const pct = l.escalados > 0 ? Math.round((l.presentes / l.escalados) * 100) : 0;
+                          const pct =
+                            l.escalados > 0 && diasConsiderados > 0
+                              ? Math.round((l.presentesTotal / (l.escalados * diasConsiderados)) * 100)
+                              : 0;
                           return (
                             <tr key={l.filial_id} className="border-b border-ink/5 last:border-0 dark:border-white/5">
                               <td className="px-4 py-2.5 font-medium text-ink dark:text-white">{l.filial_nome}</td>
                               <td className="px-4 py-2.5 text-right text-ink/70 dark:text-white/70">{l.escalados}</td>
-                              <td className="px-4 py-2.5 text-right text-[#2E7D32]">{l.presentes}</td>
+                              <td className="px-4 py-2.5 text-right text-[#2E7D32]">{l.presentesTotal}</td>
                               <td className="px-4 py-2.5 text-right font-semibold text-ink dark:text-white">{pct}%</td>
-                              <td className="px-4 py-2.5 text-right text-danger">{l.faltas}</td>
+                              <td className="px-4 py-2.5 text-right text-danger">{l.faltasTotal}</td>
                               <td className="px-4 py-2.5 text-right text-ink/70 dark:text-white/70">
                                 {l.slaMedioMin != null ? `${l.slaMedioMin} min` : "—"}
                               </td>
