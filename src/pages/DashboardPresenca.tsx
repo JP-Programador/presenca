@@ -9,6 +9,7 @@ import * as statusDiaService from "@/services/statusDiaService";
 import { listarColaboradores } from "@/services/colaboradoresService";
 import { listarHorariosEntrada } from "@/services/dashboardPresencaService";
 import { listarSlaStatusDia, ranquearPorFilial } from "@/services/slaService";
+import { AnalyticsMensal } from "@/components/presenca/AnalyticsMensal";
 import type { StatusDiaRegistro } from "@/types/status";
 import type { Colaborador } from "@/types/domain";
 
@@ -242,6 +243,8 @@ export function DashboardPresenca() {
                 )}
               </CardBody>
             </Card>
+
+            {!ehLider && <AnalyticsMensal />}
           </div>
         )}
       </main>
