@@ -18,7 +18,7 @@ import type { MotivoOutros, PontoMapaOperacional, StatusDiaRegistro } from "@/ty
 type Aba = "status_dia" | "geral";
 
 export function LiderDashboard() {
-  // Sessão já validada por <RequireAuth> na definição das rotas.
+  // Papel (admin/auditor/coordenador/gestor) já validado por <RequireRole> na definição das rotas.
   const { usuario, sair } = useAuth();
   const [aba, setAba] = useState<Aba>("status_dia");
   const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);

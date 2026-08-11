@@ -4,7 +4,6 @@ import { TecnicoCheckin } from "@/pages/TecnicoCheckin";
 import { TecnicoMarcacoes } from "@/pages/TecnicoMarcacoes";
 import { AdminLogin } from "@/pages/AdminLogin";
 import { LiderDashboard } from "@/pages/LiderDashboard";
-import { RequireAuth } from "@/routes/guards/RequireAuth";
 import { RequireRole } from "@/routes/guards/RequireRole";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 
@@ -38,9 +37,12 @@ const PAPEIS_VISAO_GLOBAL = ["admin", "auditor", "coordenador"] as const;
 const PAPEIS_AUDITORIA = ["admin", "auditor"] as const;
 const PAPEIS_GESTAO_USUARIOS = ["admin", "coordenador"] as const;
 const PAPEIS_GESTAO_COLABORADORES = ["admin", "coordenador", "gestor"] as const;
-// Dashboard de presença (gráficos/comparativo): todo mundo acima de colaborador —
+// Dashboard de presença e painel do líder: todo mundo acima de colaborador —
 // escopado pela própria hierarquia via RLS (líder só vê a equipe dele).
+// Colaborador comum não usa login administrativo (usa a tela pública de
+// check-in em "/"), então fica de fora de tudo aqui.
 const PAPEIS_DASHBOARD_PRESENCA = ["admin", "auditor", "coordenador", "gestor"] as const;
+const PAPEIS_LIDER = ["admin", "auditor", "coordenador", "gestor"] as const;
 
 export function AppRoutes() {
   return (
@@ -54,12 +56,13 @@ export function AppRoutes() {
       {/* Painel administrativo */}
       <Route path="/admin" element={<AdminLogin />} />
 
+      {/* Painel do líder — colaborador comum fica de fora (fallback "/" leva pro check-in público, evita loop com outras rotas que caem aqui) */}
       <Route
         path="/lider"
         element={
-          <RequireAuth>
+          <RequireRole roles={[...PAPEIS_LIDER]} fallback="/">
             <LiderDashboard />
-          </RequireAuth>
+          </RequireRole>
         }
       />
 
