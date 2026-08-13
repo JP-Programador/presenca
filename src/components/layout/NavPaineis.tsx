@@ -2,11 +2,11 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import type { PerfilAcesso } from "@/types/domain";
 
-const VISAO_GLOBAL: PerfilAcesso[] = ["admin", "auditor", "coordenador"];
+const VISAO_GLOBAL: PerfilAcesso[] = ["admin", "gerente", "auditor", "coordenador"];
 const AUDITORIA: PerfilAcesso[] = ["admin", "auditor"];
-const GESTAO_USUARIOS: PerfilAcesso[] = ["admin", "coordenador"];
-const GESTAO_COLABORADORES: PerfilAcesso[] = ["admin", "coordenador", "gestor"];
-const DASHBOARD_PRESENCA: PerfilAcesso[] = ["admin", "auditor", "coordenador", "gestor"];
+const GESTAO_USUARIOS: PerfilAcesso[] = ["admin", "gerente", "coordenador"];
+const GESTAO_COLABORADORES: PerfilAcesso[] = ["admin", "gerente", "coordenador", "gestor"];
+const DASHBOARD_PRESENCA: PerfilAcesso[] = ["admin", "gerente", "auditor", "coordenador", "gestor"];
 
 /**
  * Links de navegação entre os painéis administrativos + botão sair,

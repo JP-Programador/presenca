@@ -129,6 +129,19 @@ export async function atualizarPapelUsuario(
   }
 }
 
+/** Troca o coordenador direto de um líder já existente (criação só permite setar; isso reatribui depois). */
+export async function atualizarCoordenadorUsuario(id: string, coordenadorId: string | null) {
+  const { data, error } = await supabase
+    .from("perfis")
+    .update({ coordenador_id: coordenadorId })
+    .eq("id", id)
+    .select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Você não tem permissão para alterar o coordenador deste usuário.");
+  }
+}
+
 export async function ativarDesativarUsuario(id: string, ativo: boolean) {
   const { data, error } = await supabase.from("perfis").update({ ativo }).eq("id", id).select("id");
   if (error) throw error;

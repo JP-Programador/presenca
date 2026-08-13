@@ -10,6 +10,7 @@ const PAPEIS: { valor: PerfilAcesso; label: string }[] = [
   { valor: "colaborador", label: "Colaborador" },
   { valor: "gestor", label: "Gestor (líder de filial)" },
   { valor: "coordenador", label: "Coordenador" },
+  { valor: "gerente", label: "Gerente" },
   { valor: "auditor", label: "Auditor (somente leitura)" },
   { valor: "admin", label: "Administrador" },
 ];
@@ -24,6 +25,8 @@ interface NovoUsuarioFormProps {
 
 export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriado }: NovoUsuarioFormProps) {
   const criadorEhCoordenador = perfilCriador === "coordenador";
+  // Só admin cria gerente — gerente não cria outro gerente.
+  const papeisDisponiveis = PAPEIS.filter((p) => p.valor !== "gerente" || perfilCriador === "admin");
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -92,7 +95,7 @@ export function NovoUsuarioForm({ filiais, coordenadores, perfilCriador, onCriad
               onChange={(e) => setPerfil(e.target.value as PerfilAcesso)}
               className="h-11 rounded-md border border-ink/20 bg-white px-3 text-sm text-ink dark:border-white/20 dark:bg-[#242424] dark:text-white"
             >
-              {PAPEIS.map((p) => (
+              {papeisDisponiveis.map((p) => (
                 <option key={p.valor} value={p.valor}>
                   {p.label}
                 </option>

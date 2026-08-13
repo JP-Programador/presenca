@@ -1,7 +1,7 @@
 // Tipos de domínio usados pelas telas — espelham o schema SQL (supabase/migrations).
 // Serão substituídos/complementados pelos tipos gerados via `supabase gen types` em database.types.ts.
 
-export type PerfilAcesso = "admin" | "auditor" | "coordenador" | "gestor" | "colaborador";
+export type PerfilAcesso = "admin" | "gerente" | "auditor" | "coordenador" | "gestor" | "colaborador";
 
 export type TipoContrato = "clt" | "aprendiz" | "estagiario" | "temporario" | "pj";
 

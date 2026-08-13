@@ -54,6 +54,7 @@ export function ColaboradoresGestao() {
 
   const ehLider = usuario.perfil === "gestor";
   const liderFixo: PessoaSimples | undefined = ehLider ? { id: usuario.id, nome: usuario.nome } : undefined;
+  const podeExcluirPermanentemente = usuario.perfil === "admin" || usuario.perfil === "gerente";
 
   return (
     <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
@@ -138,6 +139,7 @@ export function ColaboradoresGestao() {
                         colaboradorId={c.id}
                         nome={c.nome}
                         ativo={c.ativo}
+                        podeExcluirPermanentemente={podeExcluirPermanentemente}
                         onAtualizado={carregar}
                       />
                     </div>

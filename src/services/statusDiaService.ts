@@ -5,6 +5,12 @@ import type { StatusDiaRegistro } from "@/types/status";
 const SELECT_COLUNAS =
   "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores(nome, matricula), filiais(nome), registros_presenca(foto_path)";
 
+// Mesmas colunas, mas com colaboradores!inner + ativo — usada nas listagens
+// (pendências/dashboards), pra excluir colaboradores desligados: uma vez
+// desativado, ninguém deveria ver o status dele nessas telas.
+const SELECT_COLUNAS_ATIVOS =
+  "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores!inner(nome, matricula, ativo), filiais(nome), registros_presenca(foto_path)";
+
 interface StatusDiaRowBruta
   extends Omit<
     StatusDiaRegistro,
@@ -62,7 +68,11 @@ export async function listarStatusDia(
   dataISO: string,
   filialId?: string
 ): Promise<StatusDiaRegistro[]> {
-  let query = supabase.from("status_dia").select(SELECT_COLUNAS).eq("data_referencia", dataISO);
+  let query = supabase
+    .from("status_dia")
+    .select(SELECT_COLUNAS_ATIVOS)
+    .eq("data_referencia", dataISO)
+    .eq("colaboradores.ativo", true);
   if (filialId) query = query.eq("filial_id", filialId);
 
   const { data, error } = await query.order("status", { ascending: true });
@@ -78,9 +88,10 @@ export async function listarStatusDiaPeriodo(
 ): Promise<StatusDiaRegistro[]> {
   let query = supabase
     .from("status_dia")
-    .select(SELECT_COLUNAS)
+    .select(SELECT_COLUNAS_ATIVOS)
     .gte("data_referencia", inicioISO)
-    .lte("data_referencia", fimISO);
+    .lte("data_referencia", fimISO)
+    .eq("colaboradores.ativo", true);
   if (filialId) query = query.eq("filial_id", filialId);
 
   const { data, error } = await query.order("data_referencia", { ascending: true });

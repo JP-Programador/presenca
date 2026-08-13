@@ -1,13 +1,19 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type { Filial, PerfilAcesso, UsuarioComHierarquia } from "@/types/domain";
-import { ativarDesativarUsuario, atualizarPapelUsuario } from "@/services/coordenacaoService";
+import {
+  ativarDesativarUsuario,
+  atualizarCoordenadorUsuario,
+  atualizarPapelUsuario,
+} from "@/services/coordenacaoService";
+import type { PessoaSimples } from "@/services/coordenacaoService";
 import { redefinirSenhaAdmin } from "@/services/authService";
 import { useToast } from "@/providers/ToastProvider";
 import { useAuth } from "@/providers/AuthProvider";
 
 const PAPEL_LABEL: Record<PerfilAcesso, string> = {
   admin: "Administrador",
+  gerente: "Gerente",
   auditor: "Auditor",
   coordenador: "Coordenador",
   gestor: "Gestor",
@@ -17,16 +23,21 @@ const PAPEL_LABEL: Record<PerfilAcesso, string> = {
 export function UsuarioRow({
   usuario,
   filiais,
+  coordenadores,
   onAtualizado,
 }: {
   usuario: UsuarioComHierarquia;
   filiais: Filial[];
+  coordenadores: PessoaSimples[];
   onAtualizado: () => void;
 }) {
   const [salvando, setSalvando] = useState(false);
   const { mostrar } = useToast();
   const { usuario: usuarioLogado } = useAuth();
   const souAdmin = usuarioLogado?.perfil === "admin";
+  // Só admin/gerente reatribui líder entre coordenadores — um coordenador não
+  // pode "roubar" líder de outro coordenador (mantém o isolamento da 0041).
+  const souAdminOuGerente = usuarioLogado?.perfil === "admin" || usuarioLogado?.perfil === "gerente";
 
   async function redefinirSenha() {
     setSalvando(true);
@@ -60,6 +71,18 @@ export function UsuarioRow({
       onAtualizado();
     } catch (err) {
       mostrar(err instanceof Error ? err.message : "Não foi possível alterar a filial do usuário.", "erro");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function mudarCoordenador(coordenadorId: string) {
+    setSalvando(true);
+    try {
+      await atualizarCoordenadorUsuario(usuario.id, coordenadorId || null);
+      onAtualizado();
+    } catch (err) {
+      mostrar(err instanceof Error ? err.message : "Não foi possível alterar o coordenador do usuário.", "erro");
     } finally {
       setSalvando(false);
     }
@@ -134,6 +157,25 @@ export function UsuarioRow({
           ))}
         </select>
       </div>
+
+      {usuario.perfil === "gestor" && souAdminOuGerente && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-ink/50">
+          <span>Coordenador:</span>
+          <select
+            value={usuario.coordenador_id ?? ""}
+            disabled={salvando}
+            onChange={(e) => mudarCoordenador(e.target.value)}
+            className="h-7 rounded border border-ink/15 bg-white px-1.5 text-xs text-ink"
+          >
+            <option value="">—</option>
+            {coordenadores.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </li>
   );
 }

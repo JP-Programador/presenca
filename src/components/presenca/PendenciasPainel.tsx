@@ -196,12 +196,12 @@ export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, o
                 <li
                   key={item.id}
                   className={[
-                    "flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
+                    "flex flex-col gap-2 px-4 py-3",
                     destacado ? "bg-danger/5" : "",
                   ].join(" ")}
                 >
                   <div className="min-w-0">
-                    <p className={["truncate text-sm font-semibold", destacado ? "text-danger" : "text-ink dark:text-white"].join(" ")}>
+                    <p className={["text-sm font-semibold", destacado ? "text-danger" : "text-ink dark:text-white"].join(" ")}>
                       {item.colaborador_nome ?? "Colaborador"}
                     </p>
                     <p className="truncate text-xs text-ink/50 dark:text-white/50">
@@ -210,7 +210,7 @@ export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, o
                       {item.status === "OUTROS" && item.motivo_outros ? ` · ${item.motivo_outros}` : ""}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={["rounded-full px-2.5 py-1 text-xs font-semibold", corBadge].join(" ")}>
                       {STATUS_DIA_LABEL[item.status]}
                     </span>

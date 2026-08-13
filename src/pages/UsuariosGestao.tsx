@@ -14,6 +14,7 @@ import type { Filial, UsuarioComHierarquia } from "@/types/domain";
 
 const PAPEL_LABEL: Record<string, string> = {
   admin: "Administrador",
+  gerente: "Gerente",
   auditor: "Auditor",
   coordenador: "Coordenador",
   gestor: "Gestor",
@@ -53,7 +54,7 @@ export function UsuariosGestao() {
   if (!usuario) return null; // narrowing de tipo; na prática nunca alcançado (ver RequireRole)
 
   // Agrupado por papel para dar a leitura de hierarquia (admin > coordenador > gestor > colaborador)
-  const grupos: { papel: string; itens: UsuarioComHierarquia[] }[] = ["admin", "auditor", "coordenador", "gestor", "colaborador"]
+  const grupos: { papel: string; itens: UsuarioComHierarquia[] }[] = ["admin", "gerente", "auditor", "coordenador", "gestor", "colaborador"]
     .map((papel) => ({ papel, itens: usuarios.filter((u) => u.perfil === papel) }))
     .filter((g) => g.itens.length > 0);
 
@@ -130,7 +131,13 @@ export function UsuariosGestao() {
                     </p>
                     <ul className="divide-y divide-ink/5">
                       {grupo.itens.map((u) => (
-                        <UsuarioRow key={u.id} usuario={u} filiais={filiais} onAtualizado={carregar} />
+                        <UsuarioRow
+                          key={u.id}
+                          usuario={u}
+                          filiais={filiais}
+                          coordenadores={coordenadores}
+                          onAtualizado={carregar}
+                        />
                       ))}
                     </ul>
                   </div>

@@ -73,3 +73,17 @@ export async function atualizarColaborador(
     throw new Error("Você não tem permissão para alterar este colaborador.");
   }
 }
+
+/**
+ * Exclusão permanente (hard delete) — só funciona com o colaborador já
+ * inativo (RLS exige `ativo=false`) e admin/gerente. Apaga em cascata todo
+ * o histórico ligado a ele (registros_presenca, justificativas,
+ * marcacoes_dia, status_dia, alertas) — irreversível.
+ */
+export async function excluirColaboradorPermanentemente(id: string) {
+  const { data, error } = await supabase.from("colaboradores").delete().eq("id", id).select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Você não tem permissão para excluir este colaborador (ele precisa estar inativo).");
+  }
+}

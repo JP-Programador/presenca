@@ -33,16 +33,17 @@ const DashboardPresenca = lazy(() =>
 // - Auditoria (trilha sensível): exclusiva de admin e auditor — coordenador NÃO acessa.
 // - Gestão de usuários (líderes+): admin cria qualquer papel; coordenador só cria líderes.
 // - Gestão de colaboradores: líder (só os seus), coordenador e admin.
-const PAPEIS_VISAO_GLOBAL = ["admin", "auditor", "coordenador"] as const;
+const PAPEIS_VISAO_GLOBAL = ["admin", "gerente", "auditor", "coordenador"] as const;
 const PAPEIS_AUDITORIA = ["admin", "auditor"] as const;
-const PAPEIS_GESTAO_USUARIOS = ["admin", "coordenador"] as const;
-const PAPEIS_GESTAO_COLABORADORES = ["admin", "coordenador", "gestor"] as const;
+const PAPEIS_GESTAO_USUARIOS = ["admin", "gerente", "coordenador"] as const;
+const PAPEIS_GESTAO_COLABORADORES = ["admin", "gerente", "coordenador", "gestor"] as const;
 // Dashboard de presença e painel do líder: todo mundo acima de colaborador —
-// escopado pela própria hierarquia via RLS (líder só vê a equipe dele).
+// escopado pela própria hierarquia via RLS (líder só vê a equipe dele;
+// gerente vê tudo abaixo de admin, cruzando coordenadores).
 // Colaborador comum não usa login administrativo (usa a tela pública de
 // check-in em "/"), então fica de fora de tudo aqui.
-const PAPEIS_DASHBOARD_PRESENCA = ["admin", "auditor", "coordenador", "gestor"] as const;
-const PAPEIS_LIDER = ["admin", "auditor", "coordenador", "gestor"] as const;
+const PAPEIS_DASHBOARD_PRESENCA = ["admin", "gerente", "auditor", "coordenador", "gestor"] as const;
+const PAPEIS_LIDER = ["admin", "gerente", "auditor", "coordenador", "gestor"] as const;
 
 export function AppRoutes() {
   return (

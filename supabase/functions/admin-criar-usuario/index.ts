@@ -39,9 +39,9 @@ function json(body: unknown, status = 200) {
 interface CriarUsuarioPayload {
   nome: string;
   email: string;
-  perfil: "admin" | "auditor" | "coordenador" | "gestor" | "colaborador";
+  perfil: "admin" | "gerente" | "auditor" | "coordenador" | "gestor" | "colaborador";
   filial_id?: string | null;
-  coordenador_id?: string | null; // usado quando perfil = 'gestor' e quem cria é admin
+  coordenador_id?: string | null; // usado quando perfil = 'gestor' e quem cria é admin/gerente
 }
 
 Deno.serve(async (req: Request) => {
@@ -72,11 +72,12 @@ Deno.serve(async (req: Request) => {
     .single();
 
   const ehAdmin = perfilChamador?.perfil === "admin";
+  const ehGerente = perfilChamador?.perfil === "gerente";
   const ehCoordenador = perfilChamador?.perfil === "coordenador";
 
-  if (!ehAdmin && !ehCoordenador) {
+  if (!ehAdmin && !ehGerente && !ehCoordenador) {
     return json(
-      { error: "sem_permissao", mensagem: "Apenas administrador ou coordenador podem criar usuários." },
+      { error: "sem_permissao", mensagem: "Apenas administrador, gerente ou coordenador podem criar usuários." },
       403
     );
   }
