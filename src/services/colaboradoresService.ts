@@ -93,18 +93,47 @@ const LOCATIONIQ_TOKEN = import.meta.env.VITE_LOCATIONIQ_TOKEN as string | undef
  * gratuitos sem chave. Só entra na cascata se a variável de ambiente
  * VITE_LOCATIONIQ_TOKEN estiver configurada; sem ela, esse passo é pulado
  * silenciosamente (o resto da cascata continua funcionando).
+ *
+ * Usa busca ESTRUTURADA (`street`/`city`/`postalcode`), não texto livre —
+ * nome de rua repetido é comum no Brasil ("Rua das Orquídeas" existe em
+ * dezenas de bairros/cidades diferentes na Grande SP) e uma busca livre
+ * pode casar em qualquer um deles. Mesmo assim, valida o CEP devolvido
+ * contra o pedido (3 primeiros dígitos, região do CEP) antes de aceitar —
+ * rede de segurança pro caso do próprio LocationIQ errar a região.
  */
-async function buscarLocationIQ(query: string): Promise<{ latitude: number; longitude: number } | null> {
+async function buscarLocationIQ(params: {
+  street?: string;
+  cidade: string;
+  uf?: string;
+  cepFormatado: string;
+}): Promise<{ latitude: number; longitude: number } | null> {
   if (!LOCATIONIQ_TOKEN) return null;
   try {
-    const resp = await fetch(
-      `https://us1.locationiq.com/v1/search.php?key=${LOCATIONIQ_TOKEN}&format=json&limit=1&q=${encodeURIComponent(query)}`
-    );
+    const qs = new URLSearchParams({
+      key: LOCATIONIQ_TOKEN,
+      format: "json",
+      limit: "1",
+      addressdetails: "1",
+      country: "Brazil",
+      city: params.cidade,
+      postalcode: params.cepFormatado,
+    });
+    if (params.street) qs.set("street", params.street);
+    if (params.uf) qs.set("state", params.uf);
+
+    const resp = await fetch(`https://us1.locationiq.com/v1/search.php?${qs.toString()}`);
     if (!resp.ok) return null;
     const resultados = await resp.json();
     if (!Array.isArray(resultados) || resultados.length === 0) return null;
-    const latitude = Number(resultados[0].lat);
-    const longitude = Number(resultados[0].lon);
+
+    const alvo = resultados[0];
+    const postcodeRetornado: string | undefined = alvo.address?.postcode;
+    if (postcodeRetornado && postcodeRetornado.replace(/\D/g, "").slice(0, 3) !== params.cepFormatado.slice(0, 3)) {
+      return null; // região claramente diferente da esperada — descarta.
+    }
+
+    const latitude = Number(alvo.lat);
+    const longitude = Number(alvo.lon);
     if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
     return { latitude, longitude };
   } catch {
@@ -182,15 +211,11 @@ export async function geocodificarCep(cep: string): Promise<CoordenadaGeocodific
   }
 
   if (LOCATIONIQ_TOKEN && localidade) {
-    const tentativasLocationIQ: { query: string; precisao: PrecisaoGeocodificacao }[] = [
-      { query: juntar([logradouro, bairro, localidade, uf, "Brasil"]), precisao: "exata" },
-      { query: juntar([bairro, localidade, uf, "Brasil"]), precisao: "bairro" },
-    ];
-    for (const t of tentativasLocationIQ) {
-      if (!t.query) continue;
-      const coordenada = await buscarLocationIQ(t.query);
-      if (coordenada) return { ...coordenada, precisao: t.precisao };
-    }
+    const cepFormatado = `${cepLimpo.slice(0, 5)}-${cepLimpo.slice(5)}`;
+    const coordExata = await buscarLocationIQ({ street: logradouro, cidade: localidade, uf, cepFormatado });
+    if (coordExata) return { ...coordExata, precisao: "exata" };
+    const coordBairro = await buscarLocationIQ({ cidade: localidade, uf, cepFormatado });
+    if (coordBairro) return { ...coordBairro, precisao: "bairro" };
   }
 
   if (localidade) {
