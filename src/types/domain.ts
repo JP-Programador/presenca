@@ -50,6 +50,7 @@ export interface Colaborador {
   cep: string | null;
   latitude: number | null;
   longitude: number | null;
+  localizacao_precisao: "exata" | "bairro" | "cidade" | "manual" | null;
   // campos "achatados" via join
   filial_nome?: string;
   lider_nome?: string;

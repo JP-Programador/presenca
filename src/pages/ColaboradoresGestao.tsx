@@ -136,7 +136,14 @@ export function ColaboradoresGestao() {
                           onAtualizado={carregar}
                         />
                       )}
-                      <EditarCepColaborador colaboradorId={c.id} cepAtual={c.cep} onAtualizado={carregar} />
+                      <EditarCepColaborador
+                        colaboradorId={c.id}
+                        cepAtual={c.cep}
+                        latitudeAtual={c.latitude}
+                        longitudeAtual={c.longitude}
+                        precisaoAtual={c.localizacao_precisao}
+                        onAtualizado={carregar}
+                      />
                       <ExcluirColaboradorButton
                         colaboradorId={c.id}
                         nome={c.nome}

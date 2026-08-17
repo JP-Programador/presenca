@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
   // mesmos 4 dígitos; nesse caso raro, tratamos como ambíguo por segurança).
   const { data: candidatos, error: colaboradorError } = await supabase
     .from("colaboradores")
-    .select("id, filial_id, nome, ativo, matricula, lider_id, latitude, longitude")
+    .select("id, filial_id, nome, ativo, matricula, lider_id, latitude, longitude, localizacao_precisao")
     .eq("filial_id", filial.id)
     .eq("ativo", true)
     .ilike("matricula", `%${matricula4}`);
@@ -264,7 +264,10 @@ Deno.serve(async (req: Request) => {
   // geocodificada e o check-in aconteceu perto de casa, avisa o líder
   // direto e o coordenador dele (se houver) — mesma tabela "alertas" já
   // usada pela feature de férias.
-  if (colaborador.latitude != null && colaborador.longitude != null) {
+  // "cidade" é grosseiro demais (pode estar a dezenas de km da casa real) —
+  // ignora esse nível de precisão pro alerta de 2km, senão vira alarme
+  // essencialmente aleatório.
+  if (colaborador.latitude != null && colaborador.longitude != null && colaborador.localizacao_precisao !== "cidade") {
     const distancia = distanciaKm(latitude, longitude, colaborador.latitude, colaborador.longitude);
     if (distancia <= RAIO_ALERTA_RESIDENCIA_KM) {
       const destinatarios = new Set<string>();

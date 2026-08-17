@@ -45,10 +45,18 @@ export function NovoColaboradorForm({ liderFixo, lideres, filiais, onCriado }: N
     try {
       const criado = await criarColaborador({ nome, matricula, cargo, liderId, filialId, cep: cepInformado || undefined });
       setSucesso(true);
-      if (cepInformado && criado.latitude == null) {
-        setAvisoCep(
-          "CEP salvo, mas não conseguimos localizar a coordenada dele (endereço não encontrado no mapa) — o alerta de check-in perto de casa não vai funcionar pra esse colaborador até corrigir o CEP em /colaboradores."
-        );
+      if (cepInformado) {
+        if (criado.latitude == null) {
+          setAvisoCep(
+            "CEP salvo, mas não conseguimos localizar esse endereço em nenhum mapa — o alerta de check-in perto de casa não vai funcionar pra esse colaborador até corrigir o CEP em /colaboradores."
+          );
+        } else if (criado.localizacao_precisao === "cidade") {
+          setAvisoCep(
+            "CEP salvo, mas só localizamos pelo centro da cidade (impreciso demais) — vá em /colaboradores e arraste o pino no mapa pra posição certa, senão o alerta de proximidade não funciona pra esse colaborador."
+          );
+        } else if (criado.localizacao_precisao === "bairro") {
+          setAvisoCep("CEP salvo — localizamos só por aproximação do bairro (não a rua exata).");
+        }
       }
       setNome("");
       setMatricula("");

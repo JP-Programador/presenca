@@ -2,7 +2,7 @@ import { supabase } from "@/services/supabaseClient";
 import type { Colaborador } from "@/types/domain";
 
 const SELECT_COLUNAS =
-  "id, filial_id, lider_id, matricula, nome, cargo, tipo_contrato, ativo, cep, latitude, longitude, filiais(nome), lider:perfis!lider_id(nome)";
+  "id, filial_id, lider_id, matricula, nome, cargo, tipo_contrato, ativo, cep, latitude, longitude, localizacao_precisao, filiais(nome), lider:perfis!lider_id(nome)";
 
 interface ColaboradorRowBruta extends Omit<Colaborador, "filial_nome" | "lider_nome"> {
   filiais: { nome: string } | null;
@@ -47,12 +47,30 @@ export interface NovoColaboradorInput {
   cep?: string;
 }
 
-interface CoordenadaGeocodificada {
+/**
+ * 'exata'  — rua (+bairro) resolvidos.
+ * 'bairro' — só o bairro foi localizado.
+ * 'cidade' — só o centro da cidade (grosseiro demais pro alerta de
+ *            proximidade — checkin-publico ignora esse nível).
+ * 'manual' — usuário ajustou o pino manualmente no mapa.
+ */
+export type PrecisaoGeocodificacao = "exata" | "bairro" | "cidade" | "manual";
+
+export interface CoordenadaGeocodificada {
   latitude: number;
   longitude: number;
+  precisao: PrecisaoGeocodificacao;
 }
 
-async function buscarNominatim(query: string): Promise<CoordenadaGeocodificada | null> {
+function normalizarTexto(texto: string): string {
+  return texto
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+async function buscarNominatim(query: string): Promise<{ latitude: number; longitude: number } | null> {
   try {
     const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
     if (!resp.ok) return null;
@@ -68,19 +86,42 @@ async function buscarNominatim(query: string): Promise<CoordenadaGeocodificada |
 }
 
 /**
- * CEP -> coordenada, em duas etapas gratuitas e sem chave: ViaCEP resolve
- * o CEP num endereço legível (mais confiável pra CEP brasileiro do que
- * mandar o CEP puro pro geocoder), e o Nominatim (OpenStreetMap) converte
- * esse endereço em lat/long.
+ * Segundo provedor gratuito (Photon/Komoot), usado só quando o Nominatim não
+ * acha nada. Sem viés de local, o Photon pode devolver uma rua de mesmo nome
+ * em outro município (testado: "Rua das Orquídeas" voltou em Cajamar e Santa
+ * Bárbara d'Oeste pra uma busca de endereço em São Paulo) — por isso só
+ * aceita o resultado se a cidade dele bater com a cidade esperada do CEP.
+ */
+async function buscarPhoton(
+  query: string,
+  cidadeEsperada: string
+): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const resp = await fetch(`https://photon.komoot.io/api/?limit=5&q=${encodeURIComponent(query)}`);
+    if (!resp.ok) return null;
+    const json = await resp.json();
+    const features = Array.isArray(json.features) ? json.features : [];
+    const alvo = normalizarTexto(cidadeEsperada);
+    const match = features.find((f: { properties?: { city?: string } }) => normalizarTexto(f.properties?.city ?? "") === alvo);
+    if (!match) return null;
+    const [longitude, latitude] = match.geometry.coordinates;
+    if (typeof latitude !== "number" || typeof longitude !== "number") return null;
+    return { latitude, longitude };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * CEP -> coordenada. ViaCEP resolve o CEP num endereço legível (confiável
+ * especificamente pra CEP brasileiro), depois tenta geocodificar esse
+ * endereço em ordem decrescente de precisão, misturando dois provedores
+ * gratuitos (Nominatim e Photon) antes de cair pro centro da cidade — nunca
+ * falha o cadastro por falta de indexação de mapa, mas deixa registrado em
+ * qual nível a coordenada foi encontrada (`precisao`), pra quem for usar o
+ * dado saber o quão confiável ela é (ex.: checkin-publico ignora 'cidade').
  *
- * Bairros/ruas mais novos ou menores às vezes não estão indexados no
- * OpenStreetMap com o endereço completo — tenta em ordem decrescente de
- * precisão (rua+bairro -> só rua -> só bairro) antes de desistir. Não cai
- * pra "só cidade": isso daria uma coordenada a quilômetros de distância,
- * pior que não ter coordenada nenhuma pra um alerta de raio de 2km.
- *
- * Retorna null se o CEP for inválido ou nenhuma tentativa encontrar nada —
- * nunca lança erro, pra não travar o cadastro do colaborador por causa disso.
+ * Retorna null só se o CEP for inválido/inexistente — nunca lança erro.
  */
 export async function geocodificarCep(cep: string): Promise<CoordenadaGeocodificada | null> {
   const cepLimpo = cep.replace(/\D/g, "");
@@ -92,18 +133,43 @@ export async function geocodificarCep(cep: string): Promise<CoordenadaGeocodific
   if (endereco.erro) return null;
 
   const { logradouro, bairro, localidade, uf } = endereco;
-  const tentativas = [
-    [logradouro, bairro, localidade, uf, "Brasil"],
-    [logradouro, localidade, uf, "Brasil"],
-    [bairro, localidade, uf, "Brasil"],
-  ]
-    .map((partes) => partes.filter(Boolean).join(", "))
-    .filter((q, i, arr) => q && arr.indexOf(q) === i); // remove vazias e duplicadas (ex.: sem bairro cadastrado)
+  const dedup = new Set<string>();
+  const juntar = (partes: (string | undefined)[]) => partes.filter(Boolean).join(", ");
 
-  for (const query of tentativas) {
-    const coordenada = await buscarNominatim(query);
-    if (coordenada) return coordenada;
+  const tentativasNominatim: { query: string; precisao: PrecisaoGeocodificacao }[] = [
+    { query: juntar([logradouro, bairro, localidade, uf, "Brasil"]), precisao: "exata" },
+    { query: juntar([logradouro, localidade, uf, "Brasil"]), precisao: "exata" },
+    { query: juntar([bairro, localidade, uf, "Brasil"]), precisao: "bairro" },
+  ];
+  for (const t of tentativasNominatim) {
+    if (!t.query || dedup.has(t.query)) continue;
+    // Respeita o limite de 1 req/s do Nominatim entre tentativas dentro da
+    // mesma cascata (só espera a partir da 2ª chamada).
+    if (dedup.size > 0) await new Promise((r) => setTimeout(r, 1100));
+    dedup.add(t.query);
+    const coordenada = await buscarNominatim(t.query);
+    if (coordenada) return { ...coordenada, precisao: t.precisao };
   }
+
+  if (localidade) {
+    const tentativasPhoton: { query: string; precisao: PrecisaoGeocodificacao }[] = [
+      { query: juntar([logradouro, bairro, localidade, uf]), precisao: "exata" },
+      { query: juntar([bairro, localidade, uf]), precisao: "bairro" },
+    ];
+    for (const t of tentativasPhoton) {
+      if (!t.query || dedup.has(t.query)) continue;
+      dedup.add(t.query);
+      const coordenada = await buscarPhoton(t.query, localidade);
+      if (coordenada) return { ...coordenada, precisao: t.precisao };
+    }
+
+    // Último recurso: centro da cidade. Nunca falha o cadastro, mas é
+    // grosseiro demais pro alerta de proximidade de 2km.
+    if (dedup.size > 0) await new Promise((r) => setTimeout(r, 1100));
+    const coordenadaCidade = await buscarNominatim(juntar([localidade, uf, "Brasil"]));
+    if (coordenadaCidade) return { ...coordenadaCidade, precisao: "cidade" };
+  }
+
   return null;
 }
 
@@ -122,6 +188,7 @@ export async function criarColaborador(input: NovoColaboradorInput): Promise<Col
       cep: input.cep || null,
       latitude: coordenada?.latitude ?? null,
       longitude: coordenada?.longitude ?? null,
+      localizacao_precisao: coordenada?.precisao ?? null,
     })
     .select(SELECT_COLUNAS)
     .single();
@@ -132,7 +199,9 @@ export async function criarColaborador(input: NovoColaboradorInput): Promise<Col
 
 export async function atualizarColaborador(
   id: string,
-  dados: Partial<Pick<Colaborador, "nome" | "cargo" | "lider_id" | "ativo" | "cep" | "latitude" | "longitude">>
+  dados: Partial<
+    Pick<Colaborador, "nome" | "cargo" | "lider_id" | "ativo" | "cep" | "latitude" | "longitude" | "localizacao_precisao">
+  >
 ) {
   const { data, error } = await supabase.from("colaboradores").update(dados).eq("id", id).select("id");
   if (error) throw error;
@@ -142,14 +211,20 @@ export async function atualizarColaborador(
 }
 
 /** Cadastra/troca o CEP residencial de um colaborador já existente, geocodificando de novo. */
-export async function atualizarCepColaborador(id: string, cep: string) {
+export async function atualizarCepColaborador(id: string, cep: string): Promise<CoordenadaGeocodificada | null> {
   const coordenada = await geocodificarCep(cep);
   await atualizarColaborador(id, {
     cep,
     latitude: coordenada?.latitude ?? null,
     longitude: coordenada?.longitude ?? null,
+    localizacao_precisao: coordenada?.precisao ?? null,
   });
   return coordenada;
+}
+
+/** Ajusta manualmente a coordenada (arrastando o pino no mapa) — usado quando a geocodificação automática não foi precisa o bastante. */
+export async function atualizarCoordenadaManual(id: string, latitude: number, longitude: number) {
+  await atualizarColaborador(id, { latitude, longitude, localizacao_precisao: "manual" });
 }
 
 /**
