@@ -85,6 +85,33 @@ async function buscarNominatim(query: string): Promise<{ latitude: number; longi
   }
 }
 
+const LOCATIONIQ_TOKEN = import.meta.env.VITE_LOCATIONIQ_TOKEN as string | undefined;
+
+/**
+ * LocationIQ — provedor pago (chave própria, plano gratuito com cota diária)
+ * com cobertura bem melhor de endereços novos/informais no Brasil do que os
+ * gratuitos sem chave. Só entra na cascata se a variável de ambiente
+ * VITE_LOCATIONIQ_TOKEN estiver configurada; sem ela, esse passo é pulado
+ * silenciosamente (o resto da cascata continua funcionando).
+ */
+async function buscarLocationIQ(query: string): Promise<{ latitude: number; longitude: number } | null> {
+  if (!LOCATIONIQ_TOKEN) return null;
+  try {
+    const resp = await fetch(
+      `https://us1.locationiq.com/v1/search.php?key=${LOCATIONIQ_TOKEN}&format=json&limit=1&q=${encodeURIComponent(query)}`
+    );
+    if (!resp.ok) return null;
+    const resultados = await resp.json();
+    if (!Array.isArray(resultados) || resultados.length === 0) return null;
+    const latitude = Number(resultados[0].lat);
+    const longitude = Number(resultados[0].lon);
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
+    return { latitude, longitude };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Segundo provedor gratuito (Photon/Komoot), usado só quando o Nominatim não
  * acha nada. Sem viés de local, o Photon pode devolver uma rua de mesmo nome
@@ -115,11 +142,14 @@ async function buscarPhoton(
 /**
  * CEP -> coordenada. ViaCEP resolve o CEP num endereço legível (confiável
  * especificamente pra CEP brasileiro), depois tenta geocodificar esse
- * endereço em ordem decrescente de precisão, misturando dois provedores
- * gratuitos (Nominatim e Photon) antes de cair pro centro da cidade — nunca
- * falha o cadastro por falta de indexação de mapa, mas deixa registrado em
- * qual nível a coordenada foi encontrada (`precisao`), pra quem for usar o
- * dado saber o quão confiável ela é (ex.: checkin-publico ignora 'cidade').
+ * endereço em ordem decrescente de qualidade: Nominatim (grátis, rua+bairro
+ * -> rua -> bairro) -> LocationIQ (pago com cota grátis, só se
+ * VITE_LOCATIONIQ_TOKEN estiver configurado — cobre bem endereços novos/
+ * informais que os provedores sem chave não têm indexados) -> Photon (outro
+ * provedor grátis) -> centro da cidade como último recurso. Nunca falha o
+ * cadastro por falta de indexação de mapa, mas deixa registrado em qual
+ * nível a coordenada foi encontrada (`precisao`), pra quem for usar o dado
+ * saber o quão confiável ela é (ex.: checkin-publico ignora 'cidade').
  *
  * Retorna null só se o CEP for inválido/inexistente — nunca lança erro.
  */
@@ -149,6 +179,18 @@ export async function geocodificarCep(cep: string): Promise<CoordenadaGeocodific
     dedup.add(t.query);
     const coordenada = await buscarNominatim(t.query);
     if (coordenada) return { ...coordenada, precisao: t.precisao };
+  }
+
+  if (LOCATIONIQ_TOKEN && localidade) {
+    const tentativasLocationIQ: { query: string; precisao: PrecisaoGeocodificacao }[] = [
+      { query: juntar([logradouro, bairro, localidade, uf, "Brasil"]), precisao: "exata" },
+      { query: juntar([bairro, localidade, uf, "Brasil"]), precisao: "bairro" },
+    ];
+    for (const t of tentativasLocationIQ) {
+      if (!t.query) continue;
+      const coordenada = await buscarLocationIQ(t.query);
+      if (coordenada) return { ...coordenada, precisao: t.precisao };
+    }
   }
 
   if (localidade) {
