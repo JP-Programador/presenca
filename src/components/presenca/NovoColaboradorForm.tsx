@@ -25,6 +25,7 @@ export function NovoColaboradorForm({ liderFixo, lideres, filiais, onCriado }: N
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState(false);
+  const [avisoCep, setAvisoCep] = useState<string | null>(null);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -39,9 +40,16 @@ export function NovoColaboradorForm({ liderFixo, lideres, filiais, onCriado }: N
     setEnviando(true);
     setErro(null);
     setSucesso(false);
+    setAvisoCep(null);
+    const cepInformado = cep.trim();
     try {
-      await criarColaborador({ nome, matricula, cargo, liderId, filialId, cep: cep.trim() || undefined });
+      const criado = await criarColaborador({ nome, matricula, cargo, liderId, filialId, cep: cepInformado || undefined });
       setSucesso(true);
+      if (cepInformado && criado.latitude == null) {
+        setAvisoCep(
+          "CEP salvo, mas não conseguimos localizar a coordenada dele (endereço não encontrado no mapa) — o alerta de check-in perto de casa não vai funcionar pra esse colaborador até corrigir o CEP em /colaboradores."
+        );
+      }
       setNome("");
       setMatricula("");
       setCargo("");
@@ -60,6 +68,7 @@ export function NovoColaboradorForm({ liderFixo, lideres, filiais, onCriado }: N
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {erro && <Alert variant="danger">{erro}</Alert>}
       {sucesso && <Alert variant="success">Colaborador cadastrado.</Alert>}
+      {avisoCep && <Alert variant="warning">{avisoCep}</Alert>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Input id="nome-colaborador" label="Nome completo" value={nome} onChange={(e) => setNome(e.target.value)} required />

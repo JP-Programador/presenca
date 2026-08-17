@@ -118,7 +118,7 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
         }
 
         try {
-          await criarColaborador({
+          const criado = await criarColaborador({
             nome,
             matricula,
             cargo,
@@ -126,7 +126,15 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
             filialId: filial.id,
             cep: cep || undefined,
           });
-          resultado.push({ linha: numeroLinha, nome, ok: true });
+          resultado.push({
+            linha: numeroLinha,
+            nome,
+            ok: true,
+            mensagem:
+              cep && criado.latitude == null
+                ? "Importado, mas o CEP não foi localizado no mapa — corrija depois em /colaboradores pro alerta de check-in funcionar."
+                : undefined,
+          });
           // Pausa só quando teve CEP pra geocodificar — pra não segurar a
           // importação à toa nas linhas sem CEP.
           if (cep) await new Promise((r) => setTimeout(r, PAUSA_ENTRE_GEOCODIFICACOES_MS));
@@ -152,6 +160,7 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
 
   const sucessos = resultados?.filter((r) => r.ok).length ?? 0;
   const falhas = resultados?.filter((r) => !r.ok) ?? [];
+  const avisosCep = resultados?.filter((r) => r.ok && r.mensagem) ?? [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -211,6 +220,19 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {avisosCep.length > 0 && (
+        <div className="rounded-md border border-warning/30 bg-[#FFF3DB] px-4 py-3 text-sm text-[#8A6200]">
+          <p>CEP não localizado em {avisosCep.length} linha(s) — importado mesmo assim, sem o alerta de proximidade:</p>
+          <ul className="mt-2 list-disc pl-4 text-xs">
+            {avisosCep.map((a) => (
+              <li key={a.linha}>
+                Linha {a.linha} ({a.nome})
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

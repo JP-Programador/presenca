@@ -52,35 +52,12 @@ interface CoordenadaGeocodificada {
   longitude: number;
 }
 
-/**
- * CEP -> coordenada, em duas etapas gratuitas e sem chave: ViaCEP resolve
- * o CEP num endereço legível (mais confiável pra CEP brasileiro do que
- * mandar o CEP puro pro geocoder), e o Nominatim (OpenStreetMap) converte
- * esse endereço em lat/long. Retorna null se o CEP for inválido ou
- * qualquer uma das chamadas falhar — nunca lança erro, pra não travar o
- * cadastro do colaborador por causa disso.
- */
-export async function geocodificarCep(cep: string): Promise<CoordenadaGeocodificada | null> {
-  const cepLimpo = cep.replace(/\D/g, "");
-  if (cepLimpo.length !== 8) return null;
-
+async function buscarNominatim(query: string): Promise<CoordenadaGeocodificada | null> {
   try {
-    const respViaCep = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
-    if (!respViaCep.ok) return null;
-    const endereco = await respViaCep.json();
-    if (endereco.erro) return null;
-
-    const query = [endereco.logradouro, endereco.bairro, endereco.localidade, endereco.uf, "Brasil"]
-      .filter(Boolean)
-      .join(", ");
-
-    const respNominatim = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`
-    );
-    if (!respNominatim.ok) return null;
-    const resultados = await respNominatim.json();
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
+    if (!resp.ok) return null;
+    const resultados = await resp.json();
     if (!Array.isArray(resultados) || resultados.length === 0) return null;
-
     const latitude = Number(resultados[0].lat);
     const longitude = Number(resultados[0].lon);
     if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
@@ -88,6 +65,46 @@ export async function geocodificarCep(cep: string): Promise<CoordenadaGeocodific
   } catch {
     return null;
   }
+}
+
+/**
+ * CEP -> coordenada, em duas etapas gratuitas e sem chave: ViaCEP resolve
+ * o CEP num endereço legível (mais confiável pra CEP brasileiro do que
+ * mandar o CEP puro pro geocoder), e o Nominatim (OpenStreetMap) converte
+ * esse endereço em lat/long.
+ *
+ * Bairros/ruas mais novos ou menores às vezes não estão indexados no
+ * OpenStreetMap com o endereço completo — tenta em ordem decrescente de
+ * precisão (rua+bairro -> só rua -> só bairro) antes de desistir. Não cai
+ * pra "só cidade": isso daria uma coordenada a quilômetros de distância,
+ * pior que não ter coordenada nenhuma pra um alerta de raio de 2km.
+ *
+ * Retorna null se o CEP for inválido ou nenhuma tentativa encontrar nada —
+ * nunca lança erro, pra não travar o cadastro do colaborador por causa disso.
+ */
+export async function geocodificarCep(cep: string): Promise<CoordenadaGeocodificada | null> {
+  const cepLimpo = cep.replace(/\D/g, "");
+  if (cepLimpo.length !== 8) return null;
+
+  const respViaCep = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`).catch(() => null);
+  if (!respViaCep?.ok) return null;
+  const endereco = await respViaCep.json();
+  if (endereco.erro) return null;
+
+  const { logradouro, bairro, localidade, uf } = endereco;
+  const tentativas = [
+    [logradouro, bairro, localidade, uf, "Brasil"],
+    [logradouro, localidade, uf, "Brasil"],
+    [bairro, localidade, uf, "Brasil"],
+  ]
+    .map((partes) => partes.filter(Boolean).join(", "))
+    .filter((q, i, arr) => q && arr.indexOf(q) === i); // remove vazias e duplicadas (ex.: sem bairro cadastrado)
+
+  for (const query of tentativas) {
+    const coordenada = await buscarNominatim(query);
+    if (coordenada) return coordenada;
+  }
+  return null;
 }
 
 /** Cria um colaborador (sem login próprio) na filial escolhida no formulário. */
