@@ -21,6 +21,7 @@ export function NovoColaboradorForm({ liderFixo, lideres, filiais, onCriado }: N
   const [cargo, setCargo] = useState("");
   const [liderId, setLiderId] = useState(liderFixo?.id ?? "");
   const [filialId, setFilialId] = useState("");
+  const [cep, setCep] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState(false);
@@ -39,13 +40,14 @@ export function NovoColaboradorForm({ liderFixo, lideres, filiais, onCriado }: N
     setErro(null);
     setSucesso(false);
     try {
-      await criarColaborador({ nome, matricula, cargo, liderId, filialId });
+      await criarColaborador({ nome, matricula, cargo, liderId, filialId, cep: cep.trim() || undefined });
       setSucesso(true);
       setNome("");
       setMatricula("");
       setCargo("");
       if (!liderFixo) setLiderId("");
       setFilialId("");
+      setCep("");
       onCriado();
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Não foi possível criar o colaborador.");
@@ -88,6 +90,16 @@ export function NovoColaboradorForm({ liderFixo, lideres, filiais, onCriado }: N
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Input
+          id="cep-colaborador"
+          label="CEP residencial (opcional)"
+          value={cep}
+          onChange={(e) => setCep(e.target.value)}
+          placeholder="00000-000"
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">

@@ -19,6 +19,7 @@ interface LinhaPlanilha {
   cargo?: string;
   filial?: string;
   lider?: string;
+  cep?: string;
 }
 
 interface ResultadoLinha {
@@ -28,7 +29,10 @@ interface ResultadoLinha {
   mensagem?: string;
 }
 
-const COLUNAS_MODELO = ["nome", "matricula", "cargo", "filial", "lider"];
+const COLUNAS_MODELO = ["nome", "matricula", "cargo", "filial", "lider", "cep"];
+// Nominatim (usado pra geocodificar CEP -> lat/long) pede no máx. 1 req/s —
+// folga generosa aqui, já que o volume real de uma importação é pequeno.
+const PAUSA_ENTRE_GEOCODIFICACOES_MS = 1100;
 
 function normalizar(texto: string | undefined): string {
   return (texto ?? "")
@@ -48,7 +52,14 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
   function baixarModelo() {
     const linhas = [
       COLUNAS_MODELO,
-      ["Ana Souza", "12345", "Técnica de campo", filiais[0]?.codigo ?? "24", liderFixo ? liderFixo.nome : lideres[0]?.nome ?? ""],
+      [
+        "Ana Souza",
+        "12345",
+        "Técnica de campo",
+        filiais[0]?.codigo ?? "24",
+        liderFixo ? liderFixo.nome : lideres[0]?.nome ?? "",
+        "01310-100",
+      ],
     ];
     const planilha = XLSX.utils.aoa_to_sheet(linhas);
     const livro = XLSX.utils.book_new();
@@ -81,6 +92,7 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
         const cargo = String(linha.cargo ?? "").trim();
         const filialTexto = normalizar(linha.filial);
         const liderTexto = normalizar(linha.lider);
+        const cep = String(linha.cep ?? "").trim();
 
         if (!nome || !matricula || !cargo) {
           resultado.push({ linha: numeroLinha, nome: nome || "(sem nome)", ok: false, mensagem: "Nome, matrícula e cargo são obrigatórios." });
@@ -106,8 +118,18 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
         }
 
         try {
-          await criarColaborador({ nome, matricula, cargo, liderId: liderId!, filialId: filial.id });
+          await criarColaborador({
+            nome,
+            matricula,
+            cargo,
+            liderId: liderId!,
+            filialId: filial.id,
+            cep: cep || undefined,
+          });
           resultado.push({ linha: numeroLinha, nome, ok: true });
+          // Pausa só quando teve CEP pra geocodificar — pra não segurar a
+          // importação à toa nas linhas sem CEP.
+          if (cep) await new Promise((r) => setTimeout(r, PAUSA_ENTRE_GEOCODIFICACOES_MS));
         } catch (err) {
           resultado.push({
             linha: numeroLinha,
@@ -142,7 +164,8 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
           </>
         )}
         . Filial pode ser o código ou nome; {!liderFixo && "líder deve ser o nome exato de um líder já cadastrado; "}
-        a primeira linha deve conter os cabeçalhos.
+        <strong>cep</strong> é opcional (base do alerta de check-in perto de casa); a primeira linha deve conter os
+        cabeçalhos.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">

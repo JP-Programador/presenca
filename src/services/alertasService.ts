@@ -1,14 +1,21 @@
 import { supabase } from "@/services/supabaseClient";
 
-export interface AlertaFerias {
+export type TipoAlerta = "ferias_sobrescreveu_registro" | "checkin_proximo_residencia";
+
+export interface Alerta {
   id: string;
-  tipo: string;
+  tipo: TipoAlerta;
   colaborador_id: string | null;
   detalhes: {
+    // ferias_sobrescreveu_registro
     data_inicio?: string;
     data_fim?: string;
     datas_conflito?: string[];
     aplicado_por?: string;
+    // checkin_proximo_residencia
+    distancia_km?: number;
+    tipo_marcacao?: string;
+    data_referencia?: string;
   };
   lido: boolean;
   created_at: string;
@@ -17,12 +24,12 @@ export interface AlertaFerias {
 
 const SELECT_COLUNAS = "id, tipo, colaborador_id, detalhes, lido, created_at, colaboradores(nome)";
 
-interface AlertaRowBruta extends Omit<AlertaFerias, "colaborador_nome"> {
+interface AlertaRowBruta extends Omit<Alerta, "colaborador_nome"> {
   colaboradores: { nome: string } | null;
 }
 
 /** Lista os alertas não lidos endereçados ao usuário logado (RLS já restringe a destinatario_id = auth.uid()). */
-export async function listarAlertasNaoLidos(): Promise<AlertaFerias[]> {
+export async function listarAlertasNaoLidos(): Promise<Alerta[]> {
   const { data, error } = await supabase
     .from("alertas")
     .select(SELECT_COLUNAS)

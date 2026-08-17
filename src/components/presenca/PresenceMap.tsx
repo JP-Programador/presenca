@@ -1,10 +1,20 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Circle, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { listarLideresPorFilial, type LiderFilial } from "@/services/mapaOperacionalService";
 import { STATUS_DIA_HEX, STATUS_DIA_LABEL, type PontoMapaOperacional } from "@/types/status";
 
 const CENTRO_BRASIL: [number, number] = [-14.235, -51.9253];
+
+// DivIcon (emoji, sem asset de imagem) — evita o problema clássico do ícone
+// padrão do Leaflet quebrando em bundlers (paths relativos ao CSS).
+const ICONE_CASA = L.divIcon({
+  html: '<div style="font-size: 22px; line-height: 1;">🏠</div>',
+  className: "",
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+});
 
 interface PresenceMapProps {
   pontos: PontoMapaOperacional[];
@@ -14,10 +24,18 @@ interface PresenceMapProps {
   altura?: number;
   /** Controla o filtro por nome de fora (ex.: sincronizado com a busca do painel de pendências) — esconde o campo de busca próprio. */
   filtroNomeExterno?: string;
+  /** Marca a residência cadastrada (CEP geocodificado) com um ícone de casa — usado na trilha de um colaborador específico. */
+  casaColaborador?: { latitude: number; longitude: number } | null;
 }
 
 /** Mapa operacional completo (Módulo 9): presentes/pendentes/faltas/atestados/folgas, com filtro por filial e líder. */
-export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeExterno }: PresenceMapProps) {
+export function PresenceMap({
+  pontos,
+  somenteExibicao,
+  altura = 420,
+  filtroNomeExterno,
+  casaColaborador,
+}: PresenceMapProps) {
   const [lideresPorFilial, setLideresPorFilial] = useState<LiderFilial[]>([]);
   const [filialFiltro, setFilialFiltro] = useState("");
   const [liderFiltro, setLiderFiltro] = useState("");
@@ -81,7 +99,9 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
   const centro: [number, number] =
     comCoordenadas.length > 0
       ? [comCoordenadas[0].latitude as number, comCoordenadas[0].longitude as number]
-      : CENTRO_BRASIL;
+      : casaColaborador
+        ? [casaColaborador.latitude, casaColaborador.longitude]
+        : CENTRO_BRASIL;
 
   return (
     <div className="flex flex-col gap-3">
@@ -137,7 +157,7 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
       <div className="overflow-hidden rounded-lg border border-ink/10">
         <MapContainer
           center={centro}
-          zoom={comCoordenadas.length > 0 ? 11 : 4}
+          zoom={comCoordenadas.length > 0 || casaColaborador ? 11 : 4}
           style={{ height: `${altura}px`, width: "100%" }}
           scrollWheelZoom={false}
         >
@@ -182,6 +202,15 @@ export function PresenceMap({ pontos, somenteExibicao, altura = 420, filtroNomeE
               </CircleMarker>
             </Fragment>
           ))}
+          {casaColaborador && (
+            <Marker position={[casaColaborador.latitude, casaColaborador.longitude]} icon={ICONE_CASA}>
+              <Popup>
+                <div className="text-xs">
+                  <p className="font-semibold">Residência cadastrada</p>
+                </div>
+              </Popup>
+            </Marker>
+          )}
         </MapContainer>
       </div>
     </div>

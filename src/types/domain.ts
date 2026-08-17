@@ -47,6 +47,9 @@ export interface Colaborador {
   cargo: string | null;
   tipo_contrato: TipoContrato;
   ativo: boolean;
+  cep: string | null;
+  latitude: number | null;
+  longitude: number | null;
   // campos "achatados" via join
   filial_nome?: string;
   lider_nome?: string;

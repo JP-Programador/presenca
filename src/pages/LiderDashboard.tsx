@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/Alert";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
+import { AlertasCard } from "@/components/presenca/AlertasCard";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { MiniMapCard } from "@/components/presenca/MiniMapCard";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
@@ -124,6 +125,8 @@ export function LiderDashboard() {
       />
 
       <main className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
+        <AlertasCard />
+
         <div className="mb-5 grid grid-cols-3 gap-2">
           <MetricCard
             label="Disponibilidade"

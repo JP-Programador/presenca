@@ -12,6 +12,9 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { dentroDoLimite, extrairIp } from "../_shared/rateLimit.ts";
+import { distanciaKm } from "../_shared/geo.ts";
+
+const RAIO_ALERTA_RESIDENCIA_KM = 2;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -113,7 +116,7 @@ Deno.serve(async (req: Request) => {
   // mesmos 4 dígitos; nesse caso raro, tratamos como ambíguo por segurança).
   const { data: candidatos, error: colaboradorError } = await supabase
     .from("colaboradores")
-    .select("id, filial_id, nome, ativo, matricula")
+    .select("id, filial_id, nome, ativo, matricula, lider_id, latitude, longitude")
     .eq("filial_id", filial.id)
     .eq("ativo", true)
     .ilike("matricula", `%${matricula4}`);
@@ -255,6 +258,45 @@ Deno.serve(async (req: Request) => {
     // não desfaz o check-in por isso — o registro de presença já é a fonte
     // primária; o status_dia pode ser corrigido manualmente pelo líder.
     console.error("falha ao atualizar status_dia:", statusDiaError.message);
+  }
+
+  // 7. Alerta (não bloqueia o check-in): se o colaborador tem residência
+  // geocodificada e o check-in aconteceu perto de casa, avisa o líder
+  // direto e o coordenador dele (se houver) — mesma tabela "alertas" já
+  // usada pela feature de férias.
+  if (colaborador.latitude != null && colaborador.longitude != null) {
+    const distancia = distanciaKm(latitude, longitude, colaborador.latitude, colaborador.longitude);
+    if (distancia <= RAIO_ALERTA_RESIDENCIA_KM) {
+      const destinatarios = new Set<string>();
+      if (colaborador.lider_id) {
+        destinatarios.add(colaborador.lider_id);
+        const { data: lider } = await supabase
+          .from("perfis")
+          .select("coordenador_id")
+          .eq("id", colaborador.lider_id)
+          .maybeSingle();
+        if (lider?.coordenador_id) destinatarios.add(lider.coordenador_id);
+      }
+      const detalhes = {
+        distancia_km: Math.round(distancia * 100) / 100,
+        tipo_marcacao: tipo,
+        registro_presenca_id: registro.id,
+        data_referencia: new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }),
+      };
+      if (destinatarios.size > 0) {
+        const { error: alertaError } = await supabase.from("alertas").insert(
+          [...destinatarios].map((destinatarioId) => ({
+            tipo: "checkin_proximo_residencia",
+            colaborador_id: colaborador.id,
+            destinatario_id: destinatarioId,
+            detalhes,
+          }))
+        );
+        if (alertaError) {
+          console.error("falha ao registrar alerta de check-in próximo da residência:", alertaError.message);
+        }
+      }
+    }
   }
 
   return json({

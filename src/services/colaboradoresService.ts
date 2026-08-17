@@ -2,7 +2,7 @@ import { supabase } from "@/services/supabaseClient";
 import type { Colaborador } from "@/types/domain";
 
 const SELECT_COLUNAS =
-  "id, filial_id, lider_id, matricula, nome, cargo, tipo_contrato, ativo, filiais(nome), lider:perfis!lider_id(nome)";
+  "id, filial_id, lider_id, matricula, nome, cargo, tipo_contrato, ativo, cep, latitude, longitude, filiais(nome), lider:perfis!lider_id(nome)";
 
 interface ColaboradorRowBruta extends Omit<Colaborador, "filial_nome" | "lider_nome"> {
   filiais: { nome: string } | null;
@@ -43,10 +43,57 @@ export interface NovoColaboradorInput {
   cargo: string;
   liderId: string;
   filialId: string;
+  /** CEP residencial (opcional) — geocodificado antes de salvar, vira a base do alerta de check-in perto de casa. */
+  cep?: string;
+}
+
+interface CoordenadaGeocodificada {
+  latitude: number;
+  longitude: number;
+}
+
+/**
+ * CEP -> coordenada, em duas etapas gratuitas e sem chave: ViaCEP resolve
+ * o CEP num endereço legível (mais confiável pra CEP brasileiro do que
+ * mandar o CEP puro pro geocoder), e o Nominatim (OpenStreetMap) converte
+ * esse endereço em lat/long. Retorna null se o CEP for inválido ou
+ * qualquer uma das chamadas falhar — nunca lança erro, pra não travar o
+ * cadastro do colaborador por causa disso.
+ */
+export async function geocodificarCep(cep: string): Promise<CoordenadaGeocodificada | null> {
+  const cepLimpo = cep.replace(/\D/g, "");
+  if (cepLimpo.length !== 8) return null;
+
+  try {
+    const respViaCep = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+    if (!respViaCep.ok) return null;
+    const endereco = await respViaCep.json();
+    if (endereco.erro) return null;
+
+    const query = [endereco.logradouro, endereco.bairro, endereco.localidade, endereco.uf, "Brasil"]
+      .filter(Boolean)
+      .join(", ");
+
+    const respNominatim = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`
+    );
+    if (!respNominatim.ok) return null;
+    const resultados = await respNominatim.json();
+    if (!Array.isArray(resultados) || resultados.length === 0) return null;
+
+    const latitude = Number(resultados[0].lat);
+    const longitude = Number(resultados[0].lon);
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
+    return { latitude, longitude };
+  } catch {
+    return null;
+  }
 }
 
 /** Cria um colaborador (sem login próprio) na filial escolhida no formulário. */
 export async function criarColaborador(input: NovoColaboradorInput): Promise<Colaborador> {
+  const coordenada = input.cep ? await geocodificarCep(input.cep) : null;
+
   const { data, error } = await supabase
     .from("colaboradores")
     .insert({
@@ -55,6 +102,9 @@ export async function criarColaborador(input: NovoColaboradorInput): Promise<Col
       cargo: input.cargo,
       lider_id: input.liderId,
       filial_id: input.filialId,
+      cep: input.cep || null,
+      latitude: coordenada?.latitude ?? null,
+      longitude: coordenada?.longitude ?? null,
     })
     .select(SELECT_COLUNAS)
     .single();
@@ -65,13 +115,24 @@ export async function criarColaborador(input: NovoColaboradorInput): Promise<Col
 
 export async function atualizarColaborador(
   id: string,
-  dados: Partial<Pick<Colaborador, "nome" | "cargo" | "lider_id" | "ativo">>
+  dados: Partial<Pick<Colaborador, "nome" | "cargo" | "lider_id" | "ativo" | "cep" | "latitude" | "longitude">>
 ) {
   const { data, error } = await supabase.from("colaboradores").update(dados).eq("id", id).select("id");
   if (error) throw error;
   if (!data || data.length === 0) {
     throw new Error("Você não tem permissão para alterar este colaborador.");
   }
+}
+
+/** Cadastra/troca o CEP residencial de um colaborador já existente, geocodificando de novo. */
+export async function atualizarCepColaborador(id: string, cep: string) {
+  const coordenada = await geocodificarCep(cep);
+  await atualizarColaborador(id, {
+    cep,
+    latitude: coordenada?.latitude ?? null,
+    longitude: coordenada?.longitude ?? null,
+  });
+  return coordenada;
 }
 
 /**

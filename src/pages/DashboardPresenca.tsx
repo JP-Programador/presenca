@@ -9,6 +9,8 @@ import { hojeISO, intervaloDeDatas } from "@/lib/calendario";
 import * as statusDiaService from "@/services/statusDiaService";
 import { listarColaboradores } from "@/services/colaboradoresService";
 import { listarLideres, type PessoaSimples } from "@/services/coordenacaoService";
+import { listarMapaOperacionalPeriodo } from "@/services/mapaOperacionalService";
+import { PresenceMap } from "@/components/presenca/PresenceMap";
 import {
   listarHorariosEntrada,
   listarRegistrosAtrasados,
@@ -31,7 +33,7 @@ import {
   type RankingLiderPlanta,
   type LinhaDetalhada,
 } from "@/lib/analytics";
-import type { StatusDiaRegistro } from "@/types/status";
+import type { PontoMapaOperacional, StatusDiaRegistro } from "@/types/status";
 import type { Colaborador, RegistroPresenca } from "@/types/domain";
 
 const INTERVALO_MS = 30_000;
@@ -98,6 +100,8 @@ export function DashboardPresenca() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
+  const [pontosMapaColaborador, setPontosMapaColaborador] = useState<PontoMapaOperacional[]>([]);
+  const [carregandoMapaColaborador, setCarregandoMapaColaborador] = useState(false);
 
   const diasConsiderados = useMemo(() => intervaloDeDatas(inicio, fim).length, [inicio, fim]);
 
@@ -155,6 +159,25 @@ export function DashboardPresenca() {
         : colaboradoresDoLider.filter((c) => c.id === colaboradorFiltro),
     [colaboradoresDoLider, colaboradorFiltro]
   );
+
+  const colaboradorSelecionado = useMemo(
+    () => (colaboradorFiltro === "todos" ? null : colaboradores.find((c) => c.id === colaboradorFiltro) ?? null),
+    [colaboradores, colaboradorFiltro]
+  );
+
+  // Trilha de marcações de um colaborador específico no mapa — só busca (e só
+  // mostra) quando um colaborador está filtrado, pra não poluir a tela.
+  useEffect(() => {
+    if (colaboradorFiltro === "todos") {
+      setPontosMapaColaborador([]);
+      return;
+    }
+    setCarregandoMapaColaborador(true);
+    listarMapaOperacionalPeriodo(inicio, fim, colaboradorFiltro)
+      .then(setPontosMapaColaborador)
+      .catch(() => setPontosMapaColaborador([]))
+      .finally(() => setCarregandoMapaColaborador(false));
+  }, [colaboradorFiltro, inicio, fim]);
 
   const idsVisiveis = useMemo(() => new Set(colaboradoresVisiveis.map((c) => c.id)), [colaboradoresVisiveis]);
   const escalados = useMemo(() => colaboradoresVisiveis.filter((c) => c.ativo).length, [colaboradoresVisiveis]);
@@ -347,6 +370,38 @@ export function DashboardPresenca() {
           <div className="mb-4">
             <Alert variant="danger">{erro}</Alert>
           </div>
+        )}
+
+        {colaboradorSelecionado && (
+          <Card className="mb-6">
+            <CardHeader>
+              <h2 className="text-sm font-semibold text-ink dark:text-white">
+                Trilha de marcações — {colaboradorSelecionado.nome}
+              </h2>
+              <p className="text-xs text-ink/50 dark:text-white/50">
+                Check-ins de presença no período selecionado
+                {colaboradorSelecionado.latitude != null ? " e a residência cadastrada (🏠)." : "."}
+              </p>
+            </CardHeader>
+            <CardBody>
+              {carregandoMapaColaborador ? (
+                <div className="flex justify-center py-10">
+                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : (
+                <PresenceMap
+                  pontos={pontosMapaColaborador}
+                  somenteExibicao
+                  altura={360}
+                  casaColaborador={
+                    colaboradorSelecionado.latitude != null && colaboradorSelecionado.longitude != null
+                      ? { latitude: colaboradorSelecionado.latitude, longitude: colaboradorSelecionado.longitude }
+                      : null
+                  }
+                />
+              )}
+            </CardBody>
+          </Card>
         )}
 
         {carregando ? (

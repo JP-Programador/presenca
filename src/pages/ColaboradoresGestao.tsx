@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { NovoColaboradorForm } from "@/components/presenca/NovoColaboradorForm";
 import { ImportarColaboradoresForm } from "@/components/presenca/ImportarColaboradoresForm";
 import { TrocarLiderColaborador } from "@/components/presenca/TrocarLiderColaborador";
+import { EditarCepColaborador } from "@/components/presenca/EditarCepColaborador";
 import { ExcluirColaboradorButton } from "@/components/presenca/ExcluirColaboradorButton";
 import { useAuth } from "@/providers/AuthProvider";
 import { listarFiliais, listarLideres } from "@/services/coordenacaoService";
@@ -135,6 +136,7 @@ export function ColaboradoresGestao() {
                           onAtualizado={carregar}
                         />
                       )}
+                      <EditarCepColaborador colaboradorId={c.id} cepAtual={c.cep} onAtualizado={carregar} />
                       <ExcluirColaboradorButton
                         colaboradorId={c.id}
                         nome={c.nome}
