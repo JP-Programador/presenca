@@ -13,7 +13,7 @@ export function BrandHeader({ title, subtitle, right }: BrandHeaderProps) {
       <div className="h-1 w-full bg-gradient-to-r from-primary via-primary-dark to-primary" aria-hidden="true" />
       <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <img src="/logo-tlp.avif" alt="TLP" className="h-9 w-9 shrink-0 rounded-md object-contain" />
+          <img src="/logo-tlp.png" alt="TLP" className="h-10 w-auto shrink-0 object-contain sm:h-12" />
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-wider text-primary">TLP · Presença Operacional</p>
             <h1 className="truncate text-lg font-semibold text-ink dark:text-white sm:text-xl">{title}</h1>
