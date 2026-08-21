@@ -1,72 +1,53 @@
 import { supabase } from "@/services/supabaseClient";
 
-export interface ValidacaoAtendimento {
-  encontrado: boolean;
-  nome?: string;
-  exige_saida?: boolean;
-  tem_entrada_hoje?: boolean;
-  tem_saida_hoje?: boolean;
-}
-
-export interface AtendimentoInput {
-  codigoFilial: string;
-  matricula4: string;
-  fotoDataUrl: string;
+export interface AtendimentoPendente {
+  id: string;
+  colaborador_id: string;
+  data_referencia: string;
+  horario_registrado: string;
   latitude: number;
   longitude: number;
-  precisao?: number;
+  endereco_completo: string | null;
+  status_aprovacao: "pendente" | "aprovado" | "rejeitado";
+  colaborador_nome?: string;
+  colaborador_matricula?: string;
+  entrada_horario_registrado?: string;
 }
 
-export interface AtendimentoResultado {
-  ok: true;
-  colaborador_nome: string;
-  tipo: "entrada" | "saida";
-  horario_registrado: string;
+const SELECT_COLUNAS =
+  "id, colaborador_id, data_referencia, horario_registrado, latitude, longitude, endereco_completo, status_aprovacao, colaboradores(nome, matricula), registros_presenca!registro_presenca_entrada_id(horario_registrado)";
+
+interface AtendimentoRowBruta
+  extends Omit<AtendimentoPendente, "colaborador_nome" | "colaborador_matricula" | "entrada_horario_registrado"> {
+  colaboradores: { nome: string; matricula: string } | null;
+  registros_presenca: { horario_registrado: string } | null;
 }
 
-export interface AtendimentoErro {
-  ok: false;
-  mensagem: string;
+function mapearLinha(row: AtendimentoRowBruta): AtendimentoPendente {
+  return {
+    ...row,
+    colaborador_nome: row.colaboradores?.nome,
+    colaborador_matricula: row.colaboradores?.matricula,
+    entrada_horario_registrado: row.registros_presenca?.horario_registrado,
+  };
 }
 
-/** Confirma o colaborador e devolve se a equipe dele exige saída + o que já foi registrado hoje (sem gravar nada). */
-export async function validarAtendimento(codigoFilial: string, matricula4: string): Promise<ValidacaoAtendimento> {
-  const { data, error } = await supabase.functions.invoke("validar-atendimento", {
-    body: { codigo_filial: codigoFilial, matricula4 },
-  });
-  if (error || !data) return { encontrado: false };
-  return data as ValidacaoAtendimento;
+/** Saídas de atendimento aguardando aprovação, visíveis pelo usuário atual (mesma RLS de status_dia/registros_presenca). */
+export async function listarAtendimentosPendentes(): Promise<AtendimentoPendente[]> {
+  const { data, error } = await supabase
+    .from("marcacoes_atendimento")
+    .select(SELECT_COLUNAS)
+    .eq("status_aprovacao", "pendente")
+    .order("horario_registrado", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as unknown as AtendimentoRowBruta[]).map(mapearLinha);
 }
 
-/** Chama a Edge Function `atendimento-publico` — o servidor decide sozinho se é chegada ou saída. */
-export async function registrarAtendimento(
-  input: AtendimentoInput
-): Promise<AtendimentoResultado | AtendimentoErro> {
-  const { data, error } = await supabase.functions.invoke("atendimento-publico", {
-    body: {
-      codigo_filial: input.codigoFilial,
-      matricula4: input.matricula4,
-      foto_base64: input.fotoDataUrl,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      precisao: input.precisao,
-    },
-  });
-
-  if (error) {
-    const contexto = (error as { context?: Response }).context;
-    if (contexto) {
-      try {
-        const corpo = await contexto.clone().json();
-        if (corpo?.mensagem) return { ok: false, mensagem: corpo.mensagem };
-      } catch {
-        // corpo não era JSON — segue para a mensagem genérica abaixo
-      }
-    }
-    return { ok: false, mensagem: "Não foi possível enviar o registro. Verifique sua conexão e tente novamente." };
-  }
-  if (data?.error) {
-    return { ok: false, mensagem: data.mensagem ?? "Não foi possível registrar o atendimento." };
-  }
-  return data as AtendimentoResultado;
+/** Aprova/rejeita a saída — nunca mexe em status_dia (a presença do dia já foi decidida na aprovação da entrada). */
+async function decidirSaida(id: string, aprovar: boolean): Promise<void> {
+  const { error } = await supabase.rpc("aprovar_saida_atendimento", { p_marcacao_id: id, p_aprovar: aprovar });
+  if (error) throw error;
 }
+
+export const aprovarSaida = (id: string) => decidirSaida(id, true);
+export const rejeitarSaida = (id: string) => decidirSaida(id, false);

@@ -12,19 +12,29 @@ import { enviarCheckin, validarColaborador } from "@/services/checkinService";
 type StatusValidacao = "vazio" | "verificando" | "encontrado" | "nao_encontrado";
 
 /**
- * Tela pública de presença — hoje só marca ENTRADA (as demais marcações
- * ficam pra quando o fluxo completo de jornada for habilitado). Tudo numa
- * tela só: identificação, câmera e GPS aparecem juntos; a matrícula é
- * validada ao vivo (debounce) e barra o envio se não achar o colaborador.
+ * Porta de entrada única do técnico — presença normal e, quando o líder
+ * exigir, o fechamento do atendimento (saída) passam pelo MESMO link e pela
+ * MESMA tela. O servidor decide sozinho (olhando o banco) se a marcação é
+ * entrada ou saída — o técnico nunca escolhe, só confirma a matrícula e
+ * segue a instrução na tela.
  */
 export function TecnicoCheckin() {
   const [codigoFilial, setCodigoFilial] = useState("");
   const [matricula4, setMatricula4] = useState("");
   const [statusValidacao, setStatusValidacao] = useState<StatusValidacao>("vazio");
   const [nomeEncontrado, setNomeEncontrado] = useState<string | null>(null);
+  const [liderNome, setLiderNome] = useState<string | null>(null);
+  const [equipe, setEquipe] = useState<string | null>(null);
+  const [exigeSaida, setExigeSaida] = useState(false);
+  const [proximaMarcacao, setProximaMarcacao] = useState<"entrada" | "saida">("entrada");
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<{ nome: string; status: string; horario: string } | null>(null);
+  const [resultado, setResultado] = useState<{
+    nome: string;
+    tipo: "entrada" | "saida";
+    status?: string;
+    horario: string;
+  } | null>(null);
 
   const camera = useCamera();
   const geo = useGeolocation();
@@ -32,7 +42,8 @@ export function TecnicoCheckin() {
   const validacaoAtualRef = useRef(0);
 
   // Validação ao vivo: assim que filial + 4 dígitos estão preenchidos, confirma
-  // no servidor (debounced) se existe colaborador ativo com esses dados.
+  // no servidor (debounced) se existe colaborador ativo com esses dados, e já
+  // traz o preview de qual vai ser a próxima marcação.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -52,6 +63,10 @@ export function TecnicoCheckin() {
       if (resposta.encontrado) {
         setStatusValidacao("encontrado");
         setNomeEncontrado(resposta.nome ?? null);
+        setLiderNome(resposta.lider_nome ?? null);
+        setEquipe(resposta.equipe ?? null);
+        setExigeSaida(resposta.exige_saida ?? false);
+        setProximaMarcacao(resposta.proxima_marcacao ?? "entrada");
         if (camera.status === "idle") camera.iniciar();
         geo.capturar();
       } else {
@@ -78,7 +93,6 @@ export function TecnicoCheckin() {
       const resposta = await enviarCheckin({
         codigoFilial: codigoFilial.trim(),
         matricula4,
-        tipo: "entrada",
         fotoDataUrl: camera.fotoDataUrl,
         latitude: geo.coords.latitude,
         longitude: geo.coords.longitude,
@@ -92,6 +106,7 @@ export function TecnicoCheckin() {
 
       setResultado({
         nome: resposta.colaborador_nome,
+        tipo: resposta.tipo,
         status: resposta.status,
         horario: new Date(resposta.horario_registrado).toLocaleTimeString("pt-BR", {
           hour: "2-digit",
@@ -112,11 +127,17 @@ export function TecnicoCheckin() {
     setResultado(null);
   }
 
+  const textoBotaoEnvio = proximaMarcacao === "saida" ? "Registrar saída / finalização" : "Registrar presença / entrada";
+
   return (
     <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
       <BrandHeader title="Registro de presença" subtitle="Entrada do técnico em campo" />
 
       <main className="mx-auto max-w-md px-4 py-6 sm:py-10">
+        <p className="mb-4 text-center text-xs font-medium text-ink/60 dark:text-white/60">
+          A presença só deve ser confirmada no local do cliente.
+        </p>
+
         {resultado ? (
           <Card>
             <CardBody className="flex flex-col items-center gap-4 py-8 text-center">
@@ -124,7 +145,9 @@ export function TecnicoCheckin() {
                 ✓
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-ink dark:text-white">Presença registrada</h2>
+                <h2 className="text-lg font-semibold text-ink dark:text-white">
+                  {resultado.tipo === "saida" ? "Saída registrada" : "Presença registrada"}
+                </h2>
                 <p className="mt-1 text-sm text-ink/60 dark:text-white/60">
                   {resultado.nome} · {resultado.horario}
                 </p>
@@ -173,7 +196,16 @@ export function TecnicoCheckin() {
                   <p className="text-xs font-medium text-ink/50 dark:text-white/50">Verificando…</p>
                 )}
                 {statusValidacao === "encontrado" && nomeEncontrado && (
-                  <p className="text-sm font-semibold text-[#2E7D32]">✓ {nomeEncontrado}</p>
+                  <div className="text-sm">
+                    <p className="font-semibold text-[#2E7D32]">✓ {nomeEncontrado}</p>
+                    {(liderNome || equipe) && (
+                      <p className="text-xs text-ink/50 dark:text-white/50">
+                        {liderNome && <>Líder: {liderNome}</>}
+                        {liderNome && equipe && " · "}
+                        {equipe && <>Equipe: {equipe}</>}
+                      </p>
+                    )}
+                  </div>
                 )}
                 {statusValidacao === "nao_encontrado" && (
                   <Alert variant="danger">
@@ -244,10 +276,16 @@ export function TecnicoCheckin() {
 
                     <div className="border-t border-ink/10 pt-4 dark:border-white/10">
                       <Button size="lg" fullWidth disabled={!podeEnviar} loading={enviando} onClick={enviarPresenca}>
-                        Enviar presença
+                        {textoBotaoEnvio}
                       </Button>
                       <p className="mt-2 text-center text-xs text-ink/50 dark:text-white/50">
                         Foto e localização são obrigatórias para concluir o registro.
+                        {exigeSaida && (
+                          <>
+                            <br />
+                            Primeira marcação registra sua entrada. Segunda marcação registra sua saída.
+                          </>
+                        )}
                       </p>
                     </div>
                   </CardBody>

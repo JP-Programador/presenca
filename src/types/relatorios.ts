@@ -42,13 +42,19 @@ export const TIPOS_RELATORIO: { tipo: TipoRelatorio; label: string }[] = [
   { tipo: "atendimentos", label: "Atendimentos (chegada/saída)" },
 ];
 
-/** Uma linha do histórico de chegada/saída de atendimento (visita a cliente). */
+/** Uma linha do histórico de atendimento — entrada (presença) + saída (quando houver/for exigida), já emparelhadas. */
 export interface LinhaRelatorioAtendimento {
-  id: string;
-  data_referencia: string;
-  horario_registrado: string;
-  tipo: "entrada" | "saida";
+  registro_presenca_id: string;
   colaborador_nome: string;
   colaborador_matricula: string;
-  endereco_completo: string | null;
+  lider_nome: string | null;
+  data_entrada: string;
+  hora_entrada: string;
+  endereco_entrada: string | null;
+  data_saida: string | null;
+  hora_saida: string | null;
+  endereco_saida: string | null;
+  tempo_total_min: number | null;
+  status: "aberto" | "pendente_aprovacao_saida" | "fechado" | "saida_rejeitada";
+  alertas_gerados: number;
 }

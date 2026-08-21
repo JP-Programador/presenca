@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { ExportButtons } from "@/components/ui/ExportButtons";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
+import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
 import { AuditFilters } from "@/components/presenca/AuditFilters";
 import { AuditTimeline } from "@/components/presenca/AuditTimeline";
 import { AuditDetailsModal } from "@/components/presenca/AuditDetailsModal";
@@ -36,6 +37,10 @@ const ACAO_LABEL: Record<string, string> = {
   login: "Login",
   logout: "Logout",
   senha_redefinida_solicitada: "Redefinição de senha solicitada",
+  atendimento_saida_aprovada: "Saída de atendimento aprovada",
+  atendimento_saida_rejeitada: "Saída de atendimento rejeitada",
+  atendimento_pendente_fechamento: "Alerta: atendimento pendente de fechamento (8h)",
+  atendimento_sem_fechamento: "Alerta: atendimento sem fechamento (12h)",
 };
 
 export function AuditoriaDashboard() {
@@ -129,6 +134,8 @@ export function AuditoriaDashboard() {
             )}
           </CardBody>
         </Card>
+
+        <AtendimentosPendentesPainel somenteLeitura />
 
         <Card>
           <CardHeader className="flex flex-wrap items-center justify-between gap-3">

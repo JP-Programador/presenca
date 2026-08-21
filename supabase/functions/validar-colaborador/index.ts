@@ -3,7 +3,10 @@
 // Endpoint público leve, chamado enquanto o técnico digita filial+matrícula
 // na tela de presença — só confirma se existe um colaborador ativo com
 // esses dados (sem foto/GPS/gravação), pra mostrar um aviso "fale com o
-// líder" antes dele tentar capturar foto à toa.
+// líder" antes dele tentar capturar foto à toa. Também devolve, só de
+// leitura, qual vai ser a próxima marcação (entrada/saída) e se a equipe
+// dele exige saída de atendimento — pra tela já mostrar o botão certo
+// ANTES de abrir a câmera, sem o técnico escolher nada.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { dentroDoLimite, extrairIp } from "../_shared/rateLimit.ts";
@@ -53,12 +56,12 @@ Deno.serve(async (req: Request) => {
     return json({ encontrado: false }, 200);
   }
 
-  const { data: filial } = await supabase.from("filiais").select("id").eq("codigo", codigo_filial).maybeSingle();
+  const { data: filial } = await supabase.from("filiais").select("id, nome").eq("codigo", codigo_filial).maybeSingle();
   if (!filial) return json({ encontrado: false }, 200);
 
   const { data: candidatos } = await supabase
     .from("colaboradores")
-    .select("nome, matricula")
+    .select("id, nome, matricula, lider_id")
     .eq("filial_id", filial.id)
     .eq("ativo", true)
     .ilike("matricula", `%${matricula4}`);
@@ -66,5 +69,35 @@ Deno.serve(async (req: Request) => {
   const encontrados = (candidatos ?? []).filter((c) => c.matricula.slice(-4) === matricula4);
 
   if (encontrados.length !== 1) return json({ encontrado: false }, 200);
-  return json({ encontrado: true, nome: encontrados[0].nome }, 200);
+  const colaborador = encontrados[0];
+
+  let liderNome: string | null = null;
+  let exigeSaida = false;
+  if (colaborador.lider_id) {
+    const { data: lider } = await supabase
+      .from("perfis")
+      .select("nome, exige_saida_atendimento")
+      .eq("id", colaborador.lider_id)
+      .maybeSingle();
+    liderNome = lider?.nome ?? null;
+    exigeSaida = lider?.exige_saida_atendimento ?? false;
+  }
+
+  // Só leitura — mesma decisão (proximo_tipo_marcacao) que checkin-publico
+  // revalida de verdade na hora de gravar; aqui é só preview pra UI.
+  const { data: proximaMarcacao } = await supabase.rpc("proximo_tipo_marcacao", {
+    p_colaborador_id: colaborador.id,
+  });
+
+  return json(
+    {
+      encontrado: true,
+      nome: colaborador.nome,
+      lider_nome: liderNome,
+      equipe: filial.nome,
+      exige_saida: exigeSaida,
+      proxima_marcacao: (proximaMarcacao as string | null) ?? "entrada",
+    },
+    200
+  );
 });

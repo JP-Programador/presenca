@@ -1,6 +1,10 @@
 import { supabase } from "@/services/supabaseClient";
 
-export type TipoAlerta = "ferias_sobrescreveu_registro" | "checkin_proximo_residencia" | "atendimento_sem_saida";
+export type TipoAlerta =
+  | "ferias_sobrescreveu_registro"
+  | "checkin_proximo_residencia"
+  | "atendimento_pendente_fechamento"
+  | "atendimento_sem_fechamento";
 
 export interface Alerta {
   id: string;
@@ -16,8 +20,15 @@ export interface Alerta {
     distancia_km?: number;
     tipo_marcacao?: string;
     data_referencia?: string;
-    // atendimento_sem_saida
-    marcacao_id?: string;
+    // atendimento_pendente_fechamento / atendimento_sem_fechamento
+    registro_presenca_id?: string;
+    colaborador_matricula?: string;
+    entrada_aprovada_em?: string;
+    horas_decorridas?: number;
+    latitude?: number;
+    longitude?: number;
+    endereco_completo?: string;
+    status_saida?: "sem_saida" | "pendente" | "aprovado" | "rejeitado";
   };
   lido: boolean;
   created_at: string;

@@ -15,8 +15,13 @@ function textoAlerta(a: Alerta): string {
       a.detalhes.data_referencia
     )} foi feito a ${a.detalhes.distancia_km ?? "?"}km da residência cadastrada.`;
   }
-  if (a.tipo === "atendimento_sem_saida") {
-    return `Registrou chegada no atendimento em ${formatarData(a.detalhes.data_referencia)}, mas não registrou a saída.`;
+  if (a.tipo === "atendimento_pendente_fechamento") {
+    return `Entrada aprovada há ${a.detalhes.horas_decorridas ?? "8+"}h e ainda sem saída aprovada. A presença continua normal — é só um lembrete pra cobrar o fechamento.`;
+  }
+  if (a.tipo === "atendimento_sem_fechamento") {
+    return `⚠ Entrada aprovada há ${a.detalhes.horas_decorridas ?? "12+"}h SEM fechamento. Última localização: ${
+      a.detalhes.endereco_completo ?? "não disponível"
+    }.`;
   }
   return `Férias ${formatarData(a.detalhes.data_inicio)} a ${formatarData(a.detalhes.data_fim)} — sobrescreveu ${
     a.detalhes.datas_conflito?.length ?? 0
@@ -70,7 +75,12 @@ export function AlertasCard() {
           {alertas.map((a) => (
             <li
               key={a.id}
-              className="flex flex-col gap-2 rounded-md border border-[#8A6200]/20 bg-[#FFF3DB]/40 p-3 text-sm sm:flex-row sm:items-center sm:justify-between dark:bg-[#8A6200]/10"
+              className={[
+                "flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between",
+                a.tipo === "atendimento_sem_fechamento"
+                  ? "border-danger/30 bg-[#FBE7E7]/50 dark:bg-danger/10"
+                  : "border-[#8A6200]/20 bg-[#FFF3DB]/40 dark:bg-[#8A6200]/10",
+              ].join(" ")}
             >
               <div>
                 <p className="font-semibold text-ink dark:text-white">{a.colaborador_nome ?? "Colaborador"}</p>

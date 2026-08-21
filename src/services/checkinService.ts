@@ -1,10 +1,8 @@
 import { supabase } from "@/services/supabaseClient";
-import type { TipoMarcacao } from "@/types/domain";
 
 export interface CheckinInput {
   codigoFilial: string;
   matricula4: string; // 4 últimos dígitos da matrícula
-  tipo: TipoMarcacao;
   fotoDataUrl: string;
   latitude: number;
   longitude: number;
@@ -14,7 +12,9 @@ export interface CheckinInput {
 export interface CheckinResultado {
   ok: true;
   colaborador_nome: string;
-  status: "presente" | "atrasado";
+  /** O servidor decide sozinho — nunca é escolhido pelo técnico. */
+  tipo: "entrada" | "saida";
+  status?: "presente" | "atrasado"; // só presente quando tipo === "entrada"
   horario_registrado: string;
 }
 
@@ -26,9 +26,14 @@ export interface CheckinErro {
 export interface ValidacaoColaborador {
   encontrado: boolean;
   nome?: string;
+  lider_nome?: string | null;
+  equipe?: string | null;
+  exige_saida?: boolean;
+  /** Preview de qual vai ser a próxima marcação — checkin-publico revalida isso de verdade na hora de gravar. */
+  proxima_marcacao?: "entrada" | "saida";
 }
 
-/** Confirma, enquanto o técnico digita, se existe um colaborador ativo pra essa filial+matrícula (sem gravar nada). */
+/** Confirma, enquanto o técnico digita, se existe um colaborador ativo pra essa filial+matrícula (sem gravar nada), e já devolve o que vai acontecer na próxima marcação. */
 export async function validarColaborador(codigoFilial: string, matricula4: string): Promise<ValidacaoColaborador> {
   const { data, error } = await supabase.functions.invoke("validar-colaborador", {
     body: { codigo_filial: codigoFilial, matricula4 },
@@ -37,13 +42,17 @@ export async function validarColaborador(codigoFilial: string, matricula4: strin
   return data as ValidacaoColaborador;
 }
 
-/** Chama a Edge Function `checkin-publico`, usada pela tela do técnico (sem login). */
+/**
+ * Chama a Edge Function `checkin-publico`, usada pela tela do técnico (sem
+ * login) — porta de entrada única pra presença e atendimento. Nunca manda
+ * um "tipo": o servidor decide sozinho, olhando o banco, se é entrada ou
+ * saída, e devolve isso na resposta.
+ */
 export async function enviarCheckin(input: CheckinInput): Promise<CheckinResultado | CheckinErro> {
   const { data, error } = await supabase.functions.invoke("checkin-publico", {
     body: {
       codigo_filial: input.codigoFilial,
       matricula4: input.matricula4,
-      tipo: input.tipo,
       foto_base64: input.fotoDataUrl,
       latitude: input.latitude,
       longitude: input.longitude,
@@ -65,10 +74,10 @@ export async function enviarCheckin(input: CheckinInput): Promise<CheckinResulta
         // corpo não era JSON — segue para a mensagem genérica abaixo
       }
     }
-    return { ok: false, mensagem: "Não foi possível enviar a presença. Verifique sua conexão e tente novamente." };
+    return { ok: false, mensagem: "Não foi possível enviar o registro. Verifique sua conexão e tente novamente." };
   }
   if (data?.error) {
-    return { ok: false, mensagem: data.mensagem ?? "Não foi possível registrar a presença." };
+    return { ok: false, mensagem: data.mensagem ?? "Não foi possível registrar." };
   }
   return data as CheckinResultado;
 }

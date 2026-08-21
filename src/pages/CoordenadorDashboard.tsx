@@ -8,6 +8,7 @@ import { PresenceMap } from "@/components/presenca/PresenceMap";
 import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { AlertasCard } from "@/components/presenca/AlertasCard";
+import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
 import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
@@ -215,6 +216,7 @@ export function CoordenadorDashboard() {
         </div>
 
         <AlertasCard />
+        <AtendimentosPendentesPainel />
 
         <div className="mb-6">
           <PendenteLancarCard itens={statusDoDia} />

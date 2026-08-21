@@ -3,16 +3,22 @@
 // Endpoint público chamado pela tela do técnico (sem autenticação de usuário).
 // Identificação: código da filial + 4 últimos dígitos da matrícula (fácil de
 // digitar em campo — trocado do esquema anterior "matrícula completa + 4
-// dígitos do CPF" a pedido, ver ENTREGA_MODULOS_5_15.md). Junto com tipo de
-// marcação, foto (base64) e coordenadas GPS — todos obrigatórios — valida o
-// colaborador, sobe a foto para o Storage e grava o registro de presença
-// usando a service_role key (por isso não depende de policies de RLS para
-// papéis anônimos, mantendo o modelo de acesso das migrations 0005/0006
-// restrito a usuários autenticados do painel administrativo).
+// dígitos do CPF" a pedido, ver ENTREGA_MODULOS_5_15.md). Junto com foto
+// (base64) e coordenadas GPS — todos obrigatórios — valida o colaborador,
+// sobe a foto para o Storage e grava o registro usando a service_role key.
+//
+// Único link público pro técnico: o SERVIDOR decide sozinho, olhando o
+// banco (`proximo_tipo_marcacao`/`entrada_atendimento_aberta`), se essa
+// marcação é uma ENTRADA de presença normal ou a SAÍDA de um atendimento em
+// aberto — o front nunca escolhe, e o "tipo" enviado pelo cliente (se algum
+// dia vier) é ignorado por segurança. Time cujo líder não exige saída de
+// atendimento (exige_saida_atendimento=false) sempre cai no fluxo de
+// entrada, exatamente como sempre foi — nada muda pra eles.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { dentroDoLimite, extrairIp } from "../_shared/rateLimit.ts";
 import { distanciaKm } from "../_shared/geo.ts";
+import { geocodificarReverso } from "../_shared/geoReverso.ts";
 
 const RAIO_ALERTA_RESIDENCIA_KM = 2;
 
@@ -29,11 +35,19 @@ const CORS_HEADERS = {
 interface CheckinPayload {
   codigo_filial: string;
   matricula4: string; // 4 últimos dígitos da matrícula
-  tipo: "entrada" | "inicio_intervalo" | "fim_intervalo" | "saida";
   foto_base64: string; // dataURL completa (image/jpeg;base64,...)
   latitude: number;
   longitude: number;
   precisao?: number;
+}
+
+interface RegistroPresenca {
+  id: string;
+  filial_id: string;
+  latitude: number | null;
+  longitude: number | null;
+  endereco_completo: string | null;
+  horario_registrado: string;
 }
 
 function json(body: unknown, status = 200) {
@@ -58,17 +72,9 @@ Deno.serve(async (req: Request) => {
     return json({ error: "payload_invalido" }, 400);
   }
 
-  const { codigo_filial, matricula4, tipo, foto_base64, latitude, longitude, precisao } = payload;
+  const { codigo_filial, matricula4, foto_base64, latitude, longitude, precisao } = payload;
 
-  if (
-    !codigo_filial ||
-    !matricula4 ||
-    matricula4.length !== 4 ||
-    !tipo ||
-    !foto_base64 ||
-    latitude == null ||
-    longitude == null
-  ) {
+  if (!codigo_filial || !matricula4 || matricula4.length !== 4 || !foto_base64 || latitude == null || longitude == null) {
     return json(
       {
         error: "campos_obrigatorios",
@@ -145,36 +151,123 @@ Deno.serve(async (req: Request) => {
 
   const colaborador = encontrados[0];
 
-  // 2.1. Uma foto de "entrada" (presença) por colaborador por dia — os demais
-  // tipos (intervalo/saída) não têm esse limite. Olha o status_dia ATUAL, não
-  // se já existe algum registro de entrada hoje: se o líder rejeitou o
-  // check-in anterior, o status_dia volta pra FALTA/FOLGA e o colaborador
-  // pode tentar de novo — só bloqueia quando ainda há uma entrada pendente
-  // de aprovação ou já aprovada (PENDENTE/PRESENTE).
-  if (tipo === "entrada") {
-    const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-    const { data: statusDiaAtual, error: statusDiaError } = await supabase
-      .from("status_dia")
-      .select("status")
-      .eq("colaborador_id", colaborador.id)
-      .eq("data_referencia", hojeSp)
+  // 2.1. O servidor decide sozinho o tipo real da marcação — nunca confia
+  // em nada vindo do cliente. Time cujo líder não exige saída de
+  // atendimento sempre cai em "entrada" (comportamento de sempre).
+  let exigeSaida = false;
+  if (colaborador.lider_id) {
+    const { data: lider } = await supabase
+      .from("perfis")
+      .select("exige_saida_atendimento")
+      .eq("id", colaborador.lider_id)
       .maybeSingle();
+    exigeSaida = lider?.exige_saida_atendimento ?? false;
+  }
 
-    if (statusDiaError) {
-      return json({ error: "erro_consulta", mensagem: statusDiaError.message }, 500);
+  let entradaAberta: RegistroPresenca | null = null;
+  if (exigeSaida) {
+    const { data: entrada } = await supabase.rpc("entrada_atendimento_aberta", {
+      p_colaborador_id: colaborador.id,
+    });
+    // Função retorna tlp_presenca.registros_presenca (linha composta) — sem
+    // resultado, o PostgREST devolve um objeto com todos os campos null, não
+    // `null` puro. Só conta como "aberta" se realmente tiver um id.
+    const candidata = entrada as RegistroPresenca | null;
+    entradaAberta = candidata?.id ? candidata : null;
+  }
+
+  // =========================================================
+  // Caminho SAÍDA — só quando existe uma entrada aberta esperando fechamento.
+  // Independente da presença diária: nunca mexe em status_dia, tem
+  // aprovação própria (aprovar_saida_atendimento).
+  // =========================================================
+  if (entradaAberta) {
+    const matches = foto_base64.match(/^data:(image\/(jpeg|png|webp));base64,([a-zA-Z0-9+/=]+)$/);
+    if (!matches) {
+      return json({ error: "foto_invalida", mensagem: "Formato de foto inválido." }, 400);
     }
-    if (statusDiaAtual?.status === "PENDENTE" || statusDiaAtual?.status === "PRESENTE") {
-      return json(
-        {
-          error: "presenca_ja_registrada",
-          mensagem:
-            statusDiaAtual.status === "PENDENTE"
-              ? "Sua presença de hoje já foi registrada e está aguardando aprovação."
-              : "Sua presença de hoje já foi aprovada.",
-        },
-        409
-      );
+    const mime = matches[1];
+    const base64Data = matches[3];
+    const bytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+    const extensao = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+    const marcacaoId = crypto.randomUUID();
+    const fotoPath = `${colaborador.filial_id}/${colaborador.id}/saida-atendimento-${marcacaoId}.${extensao}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(fotoPath, bytes, { contentType: mime, upsert: false });
+
+    if (uploadError) {
+      return json({ error: "falha_upload_foto", mensagem: uploadError.message }, 500);
     }
+
+    const enderecoCompleto = await geocodificarReverso(latitude, longitude);
+    const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+
+    const { data: marcacao, error: insertError } = await supabase
+      .from("marcacoes_atendimento")
+      .insert({
+        id: marcacaoId,
+        colaborador_id: colaborador.id,
+        filial_id: colaborador.filial_id,
+        registro_presenca_entrada_id: entradaAberta.id,
+        data_referencia: hojeSp,
+        latitude,
+        longitude,
+        precisao_metros: precisao ?? null,
+        foto_path: fotoPath,
+        endereco_completo: enderecoCompleto,
+      })
+      .select("id, horario_registrado")
+      .single();
+
+    if (insertError) {
+      const { error: removeError } = await supabase.storage.from(BUCKET).remove([fotoPath]);
+      if (removeError) console.error(`falha ao remover foto órfã ${fotoPath}:`, removeError.message);
+      return json({ error: "falha_gravar_registro", mensagem: insertError.message }, 500);
+    }
+
+    return json({
+      ok: true,
+      colaborador_nome: colaborador.nome,
+      tipo: "saida",
+      horario_registrado: marcacao.horario_registrado,
+    });
+  }
+
+  // =========================================================
+  // Caminho ENTRADA — exatamente o fluxo de presença de sempre, sem
+  // nenhuma mudança de comportamento além de também guardar o endereço.
+  // =========================================================
+  const tipo = "entrada" as const;
+
+  // 2.2. Uma foto de "entrada" (presença) por colaborador por dia. Olha o
+  // status_dia ATUAL, não se já existe algum registro de entrada hoje: se
+  // o líder rejeitou o check-in anterior, o status_dia volta pra
+  // FALTA/FOLGA e o colaborador pode tentar de novo — só bloqueia quando
+  // ainda há uma entrada pendente de aprovação ou já aprovada (PENDENTE/PRESENTE).
+  const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const { data: statusDiaAtual, error: statusDiaError } = await supabase
+    .from("status_dia")
+    .select("status")
+    .eq("colaborador_id", colaborador.id)
+    .eq("data_referencia", hojeSp)
+    .maybeSingle();
+
+  if (statusDiaError) {
+    return json({ error: "erro_consulta", mensagem: statusDiaError.message }, 500);
+  }
+  if (statusDiaAtual?.status === "PENDENTE" || statusDiaAtual?.status === "PRESENTE") {
+    return json(
+      {
+        error: "presenca_ja_registrada",
+        mensagem:
+          statusDiaAtual.status === "PENDENTE"
+            ? "Sua presença de hoje já foi registrada e está aguardando aprovação."
+            : "Sua presença de hoje já foi aprovada.",
+      },
+      409
+    );
   }
 
   // 3. Calcula status comparando com a escala do dia (se existir)
@@ -183,23 +276,21 @@ Deno.serve(async (req: Request) => {
   let status: "presente" | "atrasado" = "presente";
   let horarioPrevisto: string | null = null;
 
-  if (tipo === "entrada") {
-    const { data: escala } = await supabase
-      .from("escalas")
-      .select("hora_entrada, tolerancia_min")
-      .eq("colaborador_id", colaborador.id)
-      .eq("dia_semana", diaSemana)
-      .eq("ativo", true)
-      .maybeSingle();
+  const { data: escala } = await supabase
+    .from("escalas")
+    .select("hora_entrada, tolerancia_min")
+    .eq("colaborador_id", colaborador.id)
+    .eq("dia_semana", diaSemana)
+    .eq("ativo", true)
+    .maybeSingle();
 
-    if (escala) {
-      horarioPrevisto = escala.hora_entrada;
-      const [h, m] = escala.hora_entrada.split(":").map(Number);
-      const previsto = new Date(agora);
-      previsto.setHours(h, m, 0, 0);
-      previsto.setMinutes(previsto.getMinutes() + (escala.tolerancia_min ?? 0));
-      if (agora > previsto) status = "atrasado";
-    }
+  if (escala) {
+    horarioPrevisto = escala.hora_entrada;
+    const [h, m] = escala.hora_entrada.split(":").map(Number);
+    const previsto = new Date(agora);
+    previsto.setHours(h, m, 0, 0);
+    previsto.setMinutes(previsto.getMinutes() + (escala.tolerancia_min ?? 0));
+    if (agora > previsto) status = "atrasado";
   }
 
   // 4. Decodifica e sobe a foto para o Storage
@@ -222,6 +313,9 @@ Deno.serve(async (req: Request) => {
     return json({ error: "falha_upload_foto", mensagem: uploadError.message }, 500);
   }
 
+  // Geocodificação reversa — nunca bloqueia o check-in se falhar.
+  const enderecoCompleto = await geocodificarReverso(latitude, longitude);
+
   // 5. Grava o registro de presença
   const { data: registro, error: insertError } = await supabase
     .from("registros_presenca")
@@ -236,6 +330,7 @@ Deno.serve(async (req: Request) => {
       longitude,
       precisao_metros: precisao ?? null,
       foto_path: fotoPath,
+      endereco_completo: enderecoCompleto,
     })
     .select("id, status, horario_registrado")
     .single();
@@ -249,15 +344,17 @@ Deno.serve(async (req: Request) => {
     return json({ error: "falha_gravar_registro", mensagem: insertError.message }, 500);
   }
 
-  // 6. Move o status do dia (Módulo 6) de FALTA/FOLGA para PENDENTE
-  const { error: statusDiaError } = await supabase.rpc("marcar_status_dia_pendente", {
+  // 6. Move o status do dia (Módulo 6) de FALTA/FOLGA para PENDENTE — sua
+  // aprovação (PENDENTE -> PRESENTE) é a ÚNICA aprovação de presença; não
+  // existe uma aprovação separada de "entrada de atendimento".
+  const { error: statusDiaUpdateError } = await supabase.rpc("marcar_status_dia_pendente", {
     p_colaborador_id: colaborador.id,
     p_registro_presenca_id: registro.id,
   });
-  if (statusDiaError) {
+  if (statusDiaUpdateError) {
     // não desfaz o check-in por isso — o registro de presença já é a fonte
     // primária; o status_dia pode ser corrigido manualmente pelo líder.
-    console.error("falha ao atualizar status_dia:", statusDiaError.message);
+    console.error("falha ao atualizar status_dia:", statusDiaUpdateError.message);
   }
 
   // 7. Alerta (não bloqueia o check-in): se o colaborador tem residência
@@ -284,7 +381,7 @@ Deno.serve(async (req: Request) => {
         distancia_km: Math.round(distancia * 100) / 100,
         tipo_marcacao: tipo,
         registro_presenca_id: registro.id,
-        data_referencia: new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }),
+        data_referencia: hojeSp,
       };
       if (destinatarios.size > 0) {
         const { error: alertaError } = await supabase.from("alertas").insert(
@@ -305,6 +402,7 @@ Deno.serve(async (req: Request) => {
   return json({
     ok: true,
     colaborador_nome: colaborador.nome,
+    tipo: "entrada",
     status: registro.status,
     horario_registrado: registro.horario_registrado,
   });

@@ -8,7 +8,7 @@ interface AtendimentoConfigToggleProps {
   onAtualizado: (novoValor: boolean) => void;
 }
 
-/** Só o líder vê isso — decide se a equipe inteira dele precisa registrar também a saída do atendimento, ou só a chegada. */
+/** Só o líder vê isso — decide se a equipe inteira dele precisa registrar também a saída (finalização), ou só a presença. Mesmo link público pra ambos os modos. */
 export function AtendimentoConfigToggle({ exigeSaidaAtual, onAtualizado }: AtendimentoConfigToggleProps) {
   const [salvando, setSalvando] = useState(false);
 
@@ -27,9 +27,9 @@ export function AtendimentoConfigToggle({ exigeSaidaAtual, onAtualizado }: Atend
     <Card className="mb-6">
       <CardBody className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-ink dark:text-white">Atendimento da equipe</p>
+          <p className="text-sm font-semibold text-ink dark:text-white">Modo de presença da equipe</p>
           <p className="text-xs text-ink/50 dark:text-white/50">
-            Chegada e saída de visita a cliente (tela "/atendimento"), separado da presença diária.
+            Mesmo link público de sempre — só muda se a equipe também precisa registrar a saída/finalização.
           </p>
         </div>
         <div className="flex gap-2">
@@ -39,7 +39,7 @@ export function AtendimentoConfigToggle({ exigeSaidaAtual, onAtualizado }: Atend
             disabled={salvando}
             onClick={() => escolher(false)}
           >
-            Só chegada
+            Somente presença
           </Button>
           <Button
             variant={exigeSaidaAtual ? "primary" : "secondary"}
@@ -47,7 +47,7 @@ export function AtendimentoConfigToggle({ exigeSaidaAtual, onAtualizado }: Atend
             disabled={salvando}
             onClick={() => escolher(true)}
           >
-            Chegada e saída
+            Presença (entrada e saída)
           </Button>
         </div>
       </CardBody>

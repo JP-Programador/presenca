@@ -15,10 +15,16 @@ import type { LinhaRelatorioAtendimento, LinhaRelatorioPresenca } from "@/types/
 const COLUNAS_ATENDIMENTO: { chave: keyof LinhaRelatorioAtendimento; titulo: string }[] = [
   { chave: "colaborador_nome", titulo: "Colaborador" },
   { chave: "colaborador_matricula", titulo: "Matrícula" },
-  { chave: "data_referencia", titulo: "Data" },
-  { chave: "horario_registrado", titulo: "Hora" },
-  { chave: "tipo", titulo: "Tipo" },
-  { chave: "endereco_completo", titulo: "Endereço completo" },
+  { chave: "lider_nome", titulo: "Líder" },
+  { chave: "data_entrada", titulo: "Data entrada" },
+  { chave: "hora_entrada", titulo: "Hora entrada" },
+  { chave: "endereco_entrada", titulo: "Endereço entrada" },
+  { chave: "data_saida", titulo: "Data saída" },
+  { chave: "hora_saida", titulo: "Hora saída" },
+  { chave: "endereco_saida", titulo: "Endereço saída" },
+  { chave: "tempo_total_min", titulo: "Tempo total (min)" },
+  { chave: "status", titulo: "Status" },
+  { chave: "alertas_gerados", titulo: "Alertas gerados" },
 ];
 
 const COLUNAS_PRESENCA: { chave: keyof LinhaRelatorioPresenca; titulo: string }[] = [

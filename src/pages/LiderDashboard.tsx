@@ -7,6 +7,7 @@ import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { AlertasCard } from "@/components/presenca/AlertasCard";
 import { AtendimentoConfigToggle } from "@/components/presenca/AtendimentoConfigToggle";
+import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { MiniMapCard } from "@/components/presenca/MiniMapCard";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
@@ -133,6 +134,8 @@ export function LiderDashboard() {
         {ehLiderDireto && (
           <AtendimentoConfigToggle exigeSaidaAtual={exigeSaidaAtendimento} onAtualizado={setExigeSaidaAtendimento} />
         )}
+
+        <AtendimentosPendentesPainel />
 
         <div className="mb-5 grid grid-cols-3 gap-2">
           <MetricCard
