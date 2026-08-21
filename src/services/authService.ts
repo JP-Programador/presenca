@@ -11,7 +11,7 @@ export async function obterSessaoAtual() {
 export async function buscarPerfil(userId: string): Promise<PerfilUsuario | null> {
   const { data, error } = await supabase
     .from("perfis")
-    .select("id, nome, email, perfil, filial_id, coordenador_id, senha_temporaria")
+    .select("id, nome, email, perfil, filial_id, coordenador_id, senha_temporaria, exige_saida_atendimento")
     .eq("id", userId)
     .single();
 

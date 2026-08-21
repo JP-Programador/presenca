@@ -1,5 +1,5 @@
 import { supabase } from "@/services/supabaseClient";
-import type { LinhaRelatorioPresenca } from "@/types/relatorios";
+import type { LinhaRelatorioAtendimento, LinhaRelatorioPresenca } from "@/types/relatorios";
 import type { AuditLogEntry } from "@/types/domain";
 
 export interface FiltroRelatorio {
@@ -46,6 +46,38 @@ export async function listarRelatorioPorCoordenador(
   ]);
   const idsCoordenadores = new Set((coordenadores ?? []).map((p: { id: string }) => p.id));
   return todas.filter((l) => l.aprovado_por && idsCoordenadores.has(l.aprovado_por));
+}
+
+/** Histórico de chegada/saída de atendimento (visita a cliente) no período — independente da presença. */
+export async function listarRelatorioAtendimentos(
+  inicioISO: string,
+  fimISO: string
+): Promise<LinhaRelatorioAtendimento[]> {
+  const { data, error } = await supabase
+    .from("marcacoes_atendimento")
+    .select("id, data_referencia, horario_registrado, tipo, endereco_completo, colaboradores(nome, matricula)")
+    .gte("data_referencia", inicioISO)
+    .lte("data_referencia", fimISO)
+    .order("horario_registrado", { ascending: false });
+
+  if (error) throw error;
+
+  return ((data ?? []) as unknown as Array<{
+    id: string;
+    data_referencia: string;
+    horario_registrado: string;
+    tipo: "entrada" | "saida";
+    endereco_completo: string | null;
+    colaboradores: { nome: string; matricula: string } | null;
+  }>).map((row) => ({
+    id: row.id,
+    data_referencia: row.data_referencia,
+    horario_registrado: row.horario_registrado,
+    tipo: row.tipo,
+    endereco_completo: row.endereco_completo,
+    colaborador_nome: row.colaboradores?.nome ?? "",
+    colaborador_matricula: row.colaboradores?.matricula ?? "",
+  }));
 }
 
 /**

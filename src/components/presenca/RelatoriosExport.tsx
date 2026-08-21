@@ -5,11 +5,21 @@ import { exportarCSV, exportarExcel } from "@/services/exportService";
 import { listarAuditoria } from "@/services/coordenacaoService";
 import {
   listarRejeicoes,
+  listarRelatorioAtendimentos,
   listarRelatorioPorCoordenador,
   listarRelatorioPresenca,
 } from "@/services/relatoriosService";
 import { TIPOS_RELATORIO, type TipoRelatorio } from "@/types/relatorios";
-import type { LinhaRelatorioPresenca } from "@/types/relatorios";
+import type { LinhaRelatorioAtendimento, LinhaRelatorioPresenca } from "@/types/relatorios";
+
+const COLUNAS_ATENDIMENTO: { chave: keyof LinhaRelatorioAtendimento; titulo: string }[] = [
+  { chave: "colaborador_nome", titulo: "Colaborador" },
+  { chave: "colaborador_matricula", titulo: "Matrícula" },
+  { chave: "data_referencia", titulo: "Data" },
+  { chave: "horario_registrado", titulo: "Hora" },
+  { chave: "tipo", titulo: "Tipo" },
+  { chave: "endereco_completo", titulo: "Endereço completo" },
+];
 
 const COLUNAS_PRESENCA: { chave: keyof LinhaRelatorioPresenca; titulo: string }[] = [
   { chave: "colaborador_matricula", titulo: "Matrícula" },
@@ -61,6 +71,16 @@ export function RelatoriosExport() {
         formato === "csv"
           ? exportarCSV(linhas, colunas, "auditoria.csv")
           : exportarExcel(linhas, colunas, "auditoria.xlsx");
+        return;
+      }
+
+      if (tipo === "atendimentos") {
+        const trintaDiasAtras = new Date();
+        trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+        const linhasAtendimento = await listarRelatorioAtendimentos(trintaDiasAtras.toISOString().slice(0, 10), hoje);
+        formato === "csv"
+          ? exportarCSV(linhasAtendimento, COLUNAS_ATENDIMENTO, "atendimentos.csv")
+          : exportarExcel(linhasAtendimento, COLUNAS_ATENDIMENTO, "atendimentos.xlsx");
         return;
       }
 

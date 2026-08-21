@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { TecnicoCheckin } from "@/pages/TecnicoCheckin";
 import { TecnicoMarcacoes } from "@/pages/TecnicoMarcacoes";
+import { TecnicoAtendimento } from "@/pages/TecnicoAtendimento";
 import { AdminLogin } from "@/pages/AdminLogin";
 import { LiderDashboard } from "@/pages/LiderDashboard";
 import { RequireRole } from "@/routes/guards/RequireRole";
@@ -53,6 +54,8 @@ export function AppRoutes() {
       <Route path="/ponto" element={<TecnicoCheckin />} />
       {/* Fluxo alternativo de 4 marcações diárias (Módulo 13) — opcional, não substitui "/" nem "/ponto" */}
       <Route path="/ponto4" element={<TecnicoMarcacoes />} />
+      {/* Chegada/saída de atendimento (visita a cliente) — independente da presença diária */}
+      <Route path="/atendimento" element={<TecnicoAtendimento />} />
 
       {/* Painel administrativo */}
       <Route path="/admin" element={<AdminLogin />} />

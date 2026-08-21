@@ -150,6 +150,12 @@ export async function ativarDesativarUsuario(id: string, ativo: boolean) {
   }
 }
 
+/** Líder liga/desliga a exigência de saída de atendimento pra própria equipe (RPC segura, só mexe no próprio perfil). */
+export async function atualizarModoAtendimento(exigeSaida: boolean) {
+  const { error } = await supabase.rpc("atualizar_meu_modo_atendimento", { p_exige_saida: exigeSaida });
+  if (error) throw error;
+}
+
 export interface NovoUsuarioInput {
   nome: string;
   email: string;

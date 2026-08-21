@@ -128,4 +128,6 @@ export interface PerfilUsuario {
   filial_id: string | null;
   coordenador_id?: string | null;
   senha_temporaria?: boolean;
+  /** Só relevante quando perfil = 'gestor': exige também a saída de atendimento da equipe, não só a chegada. */
+  exige_saida_atendimento?: boolean;
 }

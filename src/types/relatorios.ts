@@ -27,7 +27,8 @@ export type TipoRelatorio =
   | "por_coordenador"
   | "pendencias"
   | "rejeicoes"
-  | "auditoria";
+  | "auditoria"
+  | "atendimentos";
 
 export const TIPOS_RELATORIO: { tipo: TipoRelatorio; label: string }[] = [
   { tipo: "diario", label: "Presença diária" },
@@ -38,4 +39,16 @@ export const TIPOS_RELATORIO: { tipo: TipoRelatorio; label: string }[] = [
   { tipo: "pendencias", label: "Pendências" },
   { tipo: "rejeicoes", label: "Rejeições" },
   { tipo: "auditoria", label: "Auditoria" },
+  { tipo: "atendimentos", label: "Atendimentos (chegada/saída)" },
 ];
+
+/** Uma linha do histórico de chegada/saída de atendimento (visita a cliente). */
+export interface LinhaRelatorioAtendimento {
+  id: string;
+  data_referencia: string;
+  horario_registrado: string;
+  tipo: "entrada" | "saida";
+  colaborador_nome: string;
+  colaborador_matricula: string;
+  endereco_completo: string | null;
+}

@@ -1,6 +1,6 @@
 import { supabase } from "@/services/supabaseClient";
 
-export type TipoAlerta = "ferias_sobrescreveu_registro" | "checkin_proximo_residencia";
+export type TipoAlerta = "ferias_sobrescreveu_registro" | "checkin_proximo_residencia" | "atendimento_sem_saida";
 
 export interface Alerta {
   id: string;
@@ -16,6 +16,8 @@ export interface Alerta {
     distancia_km?: number;
     tipo_marcacao?: string;
     data_referencia?: string;
+    // atendimento_sem_saida
+    marcacao_id?: string;
   };
   lido: boolean;
   created_at: string;

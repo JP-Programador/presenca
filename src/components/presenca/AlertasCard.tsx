@@ -15,6 +15,9 @@ function textoAlerta(a: Alerta): string {
       a.detalhes.data_referencia
     )} foi feito a ${a.detalhes.distancia_km ?? "?"}km da residência cadastrada.`;
   }
+  if (a.tipo === "atendimento_sem_saida") {
+    return `Registrou chegada no atendimento em ${formatarData(a.detalhes.data_referencia)}, mas não registrou a saída.`;
+  }
   return `Férias ${formatarData(a.detalhes.data_inicio)} a ${formatarData(a.detalhes.data_fim)} — sobrescreveu ${
     a.detalhes.datas_conflito?.length ?? 0
   } dia(s) já lançado(s).`;
