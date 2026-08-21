@@ -12,7 +12,7 @@ import {
 import { TIPOS_RELATORIO, type TipoRelatorio } from "@/types/relatorios";
 import type { LinhaRelatorioAtendimento, LinhaRelatorioPresenca } from "@/types/relatorios";
 
-const COLUNAS_ATENDIMENTO: { chave: keyof LinhaRelatorioAtendimento; titulo: string }[] = [
+export const COLUNAS_ATENDIMENTO: { chave: keyof LinhaRelatorioAtendimento; titulo: string }[] = [
   { chave: "colaborador_nome", titulo: "Colaborador" },
   { chave: "colaborador_matricula", titulo: "Matrícula" },
   { chave: "lider_nome", titulo: "Líder" },
