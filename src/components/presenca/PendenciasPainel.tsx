@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { obterUrlFoto } from "@/services/presencaService";
 import { apos9hEmDiaUtil } from "@/lib/calendario";
+import { ALTURA_LISTA_CARDS } from "@/lib/uiConstantes";
 import { STATUS_DIA_LABEL, type StatusDiaRegistro } from "@/types/status";
 
 /** Botão que revela a foto do check-in — visível a qualquer login (inclusive somente leitura), já que é uma ação de consulta, não de escrita. */
@@ -188,7 +189,7 @@ export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, o
         </Card>
       ) : (
         <Card>
-          <ul className="divide-y divide-ink/5 dark:divide-white/5">
+          <ul className={`divide-y divide-ink/5 dark:divide-white/5 ${ALTURA_LISTA_CARDS}`}>
             {filtrados.map((item) => {
               const destacado = destacarFaltas && item.status === "FALTA" && !item.decidido_por && filtro === "todos";
               const corBadge = filtro !== "todos" && pertenceAoFiltro(item, filtro) ? CORES_QUANDO_ATIVO[filtro] : NEUTRO;

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { listarLideresPorFilial, type LiderFilial } from "@/services/mapaOperacionalService";
@@ -26,6 +26,17 @@ interface PresenceMapProps {
   filtroNomeExterno?: string;
   /** Marca a residência cadastrada (CEP geocodificado) com um ícone de casa — usado na trilha de um colaborador específico. */
   casaColaborador?: { latitude: number; longitude: number } | null;
+  /** Marcação em destaque (ex.: clicada numa tabela) — centraliza/zoom o mapa nela e desenha um marcador diferenciado, sem esconder os demais pontos. */
+  pontoFoco?: { latitude: number; longitude: number; label?: string } | null;
+}
+
+/** Recentraliza o mapa quando o ponto em destaque muda (MapContainer só lê center/zoom no mount). */
+function RecentralizarNoFoco({ foco }: { foco: { latitude: number; longitude: number } | null | undefined }) {
+  const mapa = useMap();
+  useEffect(() => {
+    if (foco) mapa.flyTo([foco.latitude, foco.longitude], 15, { duration: 0.6 });
+  }, [foco, mapa]);
+  return null;
 }
 
 /** Mapa operacional completo (Módulo 9): presentes/pendentes/faltas/atestados/folgas, com filtro por filial e líder. */
@@ -35,6 +46,7 @@ export function PresenceMap({
   altura = 420,
   filtroNomeExterno,
   casaColaborador,
+  pontoFoco,
 }: PresenceMapProps) {
   const [lideresPorFilial, setLideresPorFilial] = useState<LiderFilial[]>([]);
   const [filialFiltro, setFilialFiltro] = useState("");
@@ -165,6 +177,20 @@ export function PresenceMap({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          {pontoFoco && <RecentralizarNoFoco foco={pontoFoco} />}
+          {pontoFoco && (
+            <CircleMarker
+              center={[pontoFoco.latitude, pontoFoco.longitude]}
+              radius={12}
+              pathOptions={{ color: "#8A6200", fillColor: "#FFC53D", fillOpacity: 0.9, weight: 3 }}
+            >
+              <Popup>
+                <div className="text-xs">
+                  <p className="font-semibold">{pontoFoco.label ?? "Marcação selecionada"}</p>
+                </div>
+              </Popup>
+            </CircleMarker>
+          )}
           {comCoordenadas.map((p) => (
             <Fragment key={p.status_dia_id}>
               {p.precisao_metros != null && (

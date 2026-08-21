@@ -8,7 +8,8 @@ import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { AlertasCard } from "@/components/presenca/AlertasCard";
 import { AtendimentoConfigToggle } from "@/components/presenca/AtendimentoConfigToggle";
 import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
-import { RelatorioAtendimentosEquipe } from "@/components/presenca/RelatorioAtendimentosEquipe";
+import { TabelaMarcacoes } from "@/components/presenca/TabelaMarcacoes";
+import { TabelaCheckinsPertoCasa } from "@/components/presenca/TabelaCheckinsPertoCasa";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { MiniMapCard } from "@/components/presenca/MiniMapCard";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
@@ -17,6 +18,7 @@ import { hojeISO } from "@/lib/calendario";
 import * as statusDiaService from "@/services/statusDiaService";
 import { listarMapaOperacional } from "@/services/mapaOperacionalService";
 import { contarColaboradoresAtivos } from "@/services/colaboradoresService";
+import { contarIndicadoresJornada, type IndicadoresJornada } from "@/services/relatoriosService";
 import type { MotivoOutros, PontoMapaOperacional, StatusDiaRegistro } from "@/types/status";
 
 type Aba = "status_dia" | "geral";
@@ -32,6 +34,8 @@ export function LiderDashboard() {
   const [erro, setErro] = useState<string | null>(null);
   const [buscaNome, setBuscaNome] = useState("");
   const [exigeSaidaAtendimento, setExigeSaidaAtendimento] = useState(usuario?.exige_saida_atendimento ?? false);
+  const [pontoFoco, setPontoFoco] = useState<{ latitude: number; longitude: number; label?: string } | null>(null);
+  const [indicadores, setIndicadores] = useState<IndicadoresJornada | null>(null);
 
   // Aba "Geral": data selecionável (não fixa em hoje) e o mapa dessa aba
   // segue a mesma data escolhida na tabela.
@@ -81,6 +85,10 @@ export function LiderDashboard() {
 
   useEffect(() => {
     if (usuario) carregar();
+  }, [usuario]);
+
+  useEffect(() => {
+    if (usuario) contarIndicadoresJornada(30).then(setIndicadores).catch(() => {});
   }, [usuario]);
 
   useEffect(() => {
@@ -137,7 +145,7 @@ export function LiderDashboard() {
         )}
 
         <AtendimentosPendentesPainel />
-        {ehLiderDireto && exigeSaidaAtendimento && <RelatorioAtendimentosEquipe />}
+        {ehLiderDireto && exigeSaidaAtendimento && <TabelaMarcacoes />}
 
         <div className="mb-5 grid grid-cols-3 gap-2">
           <MetricCard
@@ -160,6 +168,29 @@ export function LiderDashboard() {
             destaque="warning"
           />
         </div>
+
+        {indicadores && (
+          <div className="mb-5 grid grid-cols-3 gap-2">
+            <MetricCard
+              label="Perto de casa"
+              valor={String(indicadores.pertoDeCasaColaboradores)}
+              tooltip="Colaboradores com check-in perto da residência cadastrada nos últimos 30 dias."
+              destaque="warning"
+            />
+            <MetricCard
+              label="Atendimentos +12h"
+              valor={String(indicadores.mais12h)}
+              tooltip="Marcações de entrada->saída com mais de 12h de duração, últimos 30 dias."
+              destaque="danger"
+            />
+            <MetricCard
+              label="Sem interjornada 11h"
+              valor={String(indicadores.semInterjornada)}
+              tooltip="Menos de 11h de descanso entre turnos, últimos 30 dias."
+              destaque="danger"
+            />
+          </div>
+        )}
 
         <div className="mb-5">
           <PendenteLancarCard itens={statusDoDia} />
@@ -199,8 +230,9 @@ export function LiderDashboard() {
         ) : (
           <div className="flex flex-col gap-3">
             {aba === "status_dia" && (
-              <div className="mb-4">
-                <MiniMapCard titulo="Mapa da filial (hoje)" pontos={pontosMapa} filtroNome={buscaNome} />
+              <div className="mb-4 flex flex-col gap-4">
+                <MiniMapCard titulo="Mapa da filial (hoje)" pontos={pontosMapa} filtroNome={buscaNome} pontoFoco={pontoFoco} />
+                <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
               </div>
             )}
 

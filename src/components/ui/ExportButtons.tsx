@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/Button";
-import { exportarCSV, exportarExcel } from "@/services/exportService";
+import { exportarCSV, exportarExcel, type ColunaExportacao } from "@/services/exportService";
 
 interface ExportButtonsProps<T extends object> {
   dados: T[];
-  colunas: { chave: keyof T; titulo: string }[];
+  colunas: ColunaExportacao<T>[];
   nomeBase: string; // sem extensão, ex.: "auditoria-2026-07"
 }
 

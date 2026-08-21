@@ -39,7 +39,7 @@ export const TIPOS_RELATORIO: { tipo: TipoRelatorio; label: string }[] = [
   { tipo: "pendencias", label: "Pendências" },
   { tipo: "rejeicoes", label: "Rejeições" },
   { tipo: "auditoria", label: "Auditoria" },
-  { tipo: "atendimentos", label: "Atendimentos (chegada/saída)" },
+  { tipo: "atendimentos", label: "Relatório de marcações" },
 ];
 
 /** Uma linha do histórico de atendimento — entrada (presença) + saída (quando houver/for exigida), já emparelhadas. */

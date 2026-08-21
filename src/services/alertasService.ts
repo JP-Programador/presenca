@@ -59,3 +59,67 @@ export async function marcarAlertaComoLido(id: string): Promise<void> {
   const { error } = await supabase.from("alertas").update({ lido: true }).eq("id", id);
   if (error) throw error;
 }
+
+export interface CheckinPertoCasa {
+  alerta_id: string;
+  colaborador_nome: string;
+  distancia_km: number | null;
+  tipo_marcacao: string | null;
+  data_referencia: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/**
+ * Histórico de check-ins feitos perto da residência cadastrada (RLS já
+ * restringe pelo destinatário do alerta — líder/coordenador só vê o próprio
+ * time). Junta com registros_presenca pra recuperar lat/lon (o alerta em si
+ * só guarda a distância, não a coordenada).
+ */
+export async function listarCheckinsPertoCasa(diasAtras = 30): Promise<CheckinPertoCasa[]> {
+  const desde = new Date();
+  desde.setDate(desde.getDate() - diasAtras);
+
+  const { data, error } = await supabase
+    .from("alertas")
+    .select("id, detalhes, colaboradores(nome)")
+    .eq("tipo", "checkin_proximo_residencia")
+    .gte("created_at", desde.toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  interface LinhaBruta {
+    id: string;
+    detalhes: Alerta["detalhes"];
+    colaboradores: { nome: string } | null;
+  }
+  const linhas = (data ?? []) as unknown as LinhaBruta[];
+  const idsRegistro = [...new Set(linhas.map((l) => l.detalhes.registro_presenca_id).filter(Boolean))] as string[];
+  if (idsRegistro.length === 0) return [];
+
+  const { data: registros } = await supabase
+    .from("registros_presenca")
+    .select("id, latitude, longitude")
+    .in("id", idsRegistro);
+  const coordenadasPorId = new Map(
+    (registros ?? []).map((r: { id: string; latitude: number | null; longitude: number | null }) => [
+      r.id,
+      { latitude: r.latitude, longitude: r.longitude },
+    ])
+  );
+
+  return linhas
+    .filter((l) => l.detalhes.registro_presenca_id && coordenadasPorId.has(l.detalhes.registro_presenca_id))
+    .map((l) => {
+      const coords = coordenadasPorId.get(l.detalhes.registro_presenca_id!)!;
+      return {
+        alerta_id: l.id,
+        colaborador_nome: l.colaboradores?.nome ?? "Colaborador",
+        distancia_km: l.detalhes.distancia_km ?? null,
+        tipo_marcacao: l.detalhes.tipo_marcacao ?? null,
+        data_referencia: l.detalhes.data_referencia ?? null,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      };
+    });
+}

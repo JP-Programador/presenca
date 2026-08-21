@@ -9,6 +9,8 @@ import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { AlertasCard } from "@/components/presenca/AlertasCard";
 import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
+import { TabelaMarcacoes } from "@/components/presenca/TabelaMarcacoes";
+import { TabelaCheckinsPertoCasa } from "@/components/presenca/TabelaCheckinsPertoCasa";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
 import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
@@ -20,6 +22,7 @@ import * as statusDiaService from "@/services/statusDiaService";
 import { listarMapaOperacional } from "@/services/mapaOperacionalService";
 import { contarColaboradoresAtivos } from "@/services/colaboradoresService";
 import { listarSlaStatusDia, mediaDiaria, mediaMensal, ranquearPorLider } from "@/services/slaService";
+import { contarIndicadoresJornada, type IndicadoresJornada } from "@/services/relatoriosService";
 import type { SlaLider } from "@/types/domain";
 import type { MotivoOutros, PontoMapaOperacional, SlaStatusDia, StatusDiaRegistro } from "@/types/status";
 
@@ -38,6 +41,8 @@ export function CoordenadorDashboard() {
   const [carregandoDados, setCarregandoDados] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [buscaNome, setBuscaNome] = useState("");
+  const [pontoFoco, setPontoFoco] = useState<{ latitude: number; longitude: number; label?: string } | null>(null);
+  const [indicadores, setIndicadores] = useState<IndicadoresJornada | null>(null);
 
   async function carregar(silencioso = false) {
     if (!silencioso) setCarregandoDados(true);
@@ -95,6 +100,10 @@ export function CoordenadorDashboard() {
   useEffect(() => {
     if (usuario) carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario]);
+
+  useEffect(() => {
+    if (usuario) contarIndicadoresJornada(30).then(setIndicadores).catch(() => {});
   }, [usuario]);
 
   useEffect(() => {
@@ -215,6 +224,29 @@ export function CoordenadorDashboard() {
           />
         </div>
 
+        {indicadores && (
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <MetricCard
+              label="Bate ponto perto de casa"
+              valor={String(indicadores.pertoDeCasaColaboradores)}
+              tooltip="Colaboradores com pelo menos um check-in perto da residência cadastrada nos últimos 30 dias."
+              destaque="warning"
+            />
+            <MetricCard
+              label="Atendimentos +12h"
+              valor={String(indicadores.mais12h)}
+              tooltip="Marcações de entrada->saída de atendimento com mais de 12h de duração, últimos 30 dias."
+              destaque="danger"
+            />
+            <MetricCard
+              label="Sem interjornada de 11h"
+              valor={String(indicadores.semInterjornada)}
+              tooltip="Colaboradores com menos de 11h de descanso entre o fim de um turno e o início do próximo, últimos 30 dias. Só considera times com saída de atendimento registrada."
+              destaque="danger"
+            />
+          </div>
+        )}
+
         <AlertasCard />
         <AtendimentosPendentesPainel />
 
@@ -243,10 +275,14 @@ export function CoordenadorDashboard() {
             {carregandoMapa ? (
               <MapaCarregando />
             ) : (
-              <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} />
+              <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} pontoFoco={pontoFoco} />
             )}
           </CardBody>
         </Card>
+
+        <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
+
+        <TabelaMarcacoes />
 
         <Card className="mb-6">
           <CardHeader>

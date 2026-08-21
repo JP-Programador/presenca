@@ -1,9 +1,18 @@
 import * as XLSX from "xlsx";
 
+export interface ColunaExportacao<T> {
+  chave: keyof T;
+  titulo: string;
+  /** Formata o valor cru pro padrão de exibição (ex.: timestamp ISO -> "21/08/2026 15:32"). */
+  formatar?: (valor: T[keyof T], linha: T) => string;
+}
+
 /** Converte um array de objetos "achatados" em linhas de tabela (mesma ordem de colunas). */
-function paraLinhas<T extends object>(dados: T[], colunas: { chave: keyof T; titulo: string }[]) {
+function paraLinhas<T extends object>(dados: T[], colunas: ColunaExportacao<T>[]) {
   const cabecalho = colunas.map((c) => c.titulo);
-  const linhas = dados.map((item) => colunas.map((c) => item[c.chave] ?? ""));
+  const linhas = dados.map((item) =>
+    colunas.map((c) => (c.formatar ? c.formatar(item[c.chave], item) : (item[c.chave] ?? "")))
+  );
   return [cabecalho, ...linhas];
 }
 
@@ -22,7 +31,7 @@ function baixarArquivo(conteudo: BlobPart, nomeArquivo: string, mime: string) {
 /** Exporta como CSV (separador ";", compatível com Excel em pt-BR). */
 export function exportarCSV<T extends object>(
   dados: T[],
-  colunas: { chave: keyof T; titulo: string }[],
+  colunas: ColunaExportacao<T>[],
   nomeArquivo: string
 ) {
   const linhas = paraLinhas(dados, colunas);
@@ -44,7 +53,7 @@ export function exportarCSV<T extends object>(
 /** Exporta como planilha .xlsx (SheetJS). */
 export function exportarExcel<T extends object>(
   dados: T[],
-  colunas: { chave: keyof T; titulo: string }[],
+  colunas: ColunaExportacao<T>[],
   nomeArquivo: string,
   nomeAba = "Dados"
 ) {

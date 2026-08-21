@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { hojeISO } from "@/lib/calendario";
+import { ALTURA_TABELA_COMPACTA } from "@/lib/uiConstantes";
 import * as statusDiaService from "@/services/statusDiaService";
 import { ExportButtons } from "@/components/ui/ExportButtons";
 import { TabelaMensalStatus } from "@/components/presenca/TabelaMensalStatus";
@@ -173,9 +174,9 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
               <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-ink/10 dark:border-white/10">
+            <div className={`overflow-x-auto rounded-lg border border-ink/10 dark:border-white/10 ${ALTURA_TABELA_COMPACTA}`}>
               <table className="w-full min-w-[420px] text-left text-sm">
-                <thead>
+                <thead className="sticky top-0 bg-white dark:bg-[#242424]">
                   <tr className="border-b border-ink/10 bg-surface text-xs uppercase tracking-wide text-ink/50 dark:border-white/10 dark:bg-white/5 dark:text-white/50">
                     <th className="px-4 py-2">Nome</th>
                     <th className="px-4 py-2">Filial</th>

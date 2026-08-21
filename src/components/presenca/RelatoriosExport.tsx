@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { hojeISO } from "@/lib/calendario";
+import { formatarDataBR, formatarDataHoraBR, formatarHoraBR } from "@/lib/formato";
 import { exportarCSV, exportarExcel } from "@/services/exportService";
 import { listarAuditoria } from "@/services/coordenacaoService";
 import {
@@ -12,29 +13,29 @@ import {
 import { TIPOS_RELATORIO, type TipoRelatorio } from "@/types/relatorios";
 import type { LinhaRelatorioAtendimento, LinhaRelatorioPresenca } from "@/types/relatorios";
 
-export const COLUNAS_ATENDIMENTO: { chave: keyof LinhaRelatorioAtendimento; titulo: string }[] = [
+export const COLUNAS_ATENDIMENTO: { chave: keyof LinhaRelatorioAtendimento; titulo: string; formatar?: (v: unknown) => string }[] = [
   { chave: "colaborador_nome", titulo: "Colaborador" },
   { chave: "colaborador_matricula", titulo: "Matrícula" },
   { chave: "lider_nome", titulo: "Líder" },
-  { chave: "data_entrada", titulo: "Data entrada" },
-  { chave: "hora_entrada", titulo: "Hora entrada" },
+  { chave: "data_entrada", titulo: "Data entrada", formatar: (v) => formatarDataBR(v as string) },
+  { chave: "hora_entrada", titulo: "Hora entrada", formatar: (v) => formatarHoraBR(v as string) },
   { chave: "endereco_entrada", titulo: "Endereço entrada" },
-  { chave: "data_saida", titulo: "Data saída" },
-  { chave: "hora_saida", titulo: "Hora saída" },
+  { chave: "data_saida", titulo: "Data saída", formatar: (v) => formatarDataBR(v as string) },
+  { chave: "hora_saida", titulo: "Hora saída", formatar: (v) => formatarHoraBR(v as string) },
   { chave: "endereco_saida", titulo: "Endereço saída" },
   { chave: "tempo_total_min", titulo: "Tempo total (min)" },
   { chave: "status", titulo: "Status" },
   { chave: "alertas_gerados", titulo: "Alertas gerados" },
 ];
 
-const COLUNAS_PRESENCA: { chave: keyof LinhaRelatorioPresenca; titulo: string }[] = [
+const COLUNAS_PRESENCA: { chave: keyof LinhaRelatorioPresenca; titulo: string; formatar?: (v: unknown) => string }[] = [
   { chave: "colaborador_matricula", titulo: "Matrícula" },
   { chave: "colaborador_nome", titulo: "Nome" },
   { chave: "lider_nome", titulo: "Líder" },
   { chave: "filial_nome", titulo: "Filial" },
   { chave: "status_final", titulo: "Status final" },
-  { chave: "hora_envio", titulo: "Hora envio" },
-  { chave: "hora_aprovacao", titulo: "Hora aprovação" },
+  { chave: "hora_envio", titulo: "Hora envio", formatar: (v) => formatarDataHoraBR(v as string) },
+  { chave: "hora_aprovacao", titulo: "Hora aprovação", formatar: (v) => formatarDataHoraBR(v as string) },
   { chave: "aprovado_por", titulo: "Aprovado por" },
   { chave: "motivo", titulo: "Motivo" },
   { chave: "observacao", titulo: "Observação" },
@@ -61,7 +62,7 @@ export function RelatoriosExport() {
       if (tipo === "auditoria") {
         const logs = await listarAuditoria({});
         const linhas = logs.map((l) => ({
-          data: new Date(l.created_at).toLocaleString("pt-BR"),
+          data: formatarDataHoraBR(l.created_at),
           acao: l.acao,
           entidade: l.entidade,
           ator: l.ator_nome ?? "Sistema",
@@ -85,8 +86,8 @@ export function RelatoriosExport() {
         trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
         const linhasAtendimento = await listarRelatorioAtendimentos(trintaDiasAtras.toISOString().slice(0, 10), hoje);
         formato === "csv"
-          ? exportarCSV(linhasAtendimento, COLUNAS_ATENDIMENTO, "atendimentos.csv")
-          : exportarExcel(linhasAtendimento, COLUNAS_ATENDIMENTO, "atendimentos.xlsx");
+          ? exportarCSV(linhasAtendimento, COLUNAS_ATENDIMENTO, "relatorio-marcacoes.csv")
+          : exportarExcel(linhasAtendimento, COLUNAS_ATENDIMENTO, "relatorio-marcacoes.xlsx");
         return;
       }
 
@@ -95,7 +96,7 @@ export function RelatoriosExport() {
         trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
         const eventos = await listarRejeicoes(trintaDiasAtras.toISOString().slice(0, 10), hoje);
         const linhas = eventos.map((e) => ({
-          data: new Date(e.created_at).toLocaleString("pt-BR"),
+          data: formatarDataHoraBR(e.created_at),
           responsavel: e.ator_nome ?? "Sistema",
           status_dia_id: e.entidade_id ?? "",
           detalhes: e.detalhes ? JSON.stringify(e.detalhes) : "",

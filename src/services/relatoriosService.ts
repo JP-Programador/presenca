@@ -139,6 +139,66 @@ export async function listarRelatorioAtendimentos(
   });
 }
 
+export interface IndicadoresJornada {
+  /** Colaboradores distintos com check-in registrado perto da residência cadastrada. */
+  pertoDeCasaColaboradores: number;
+  /** Marcações (entrada->saída) com mais de 12h de duração. */
+  mais12h: number;
+  /** Colaboradores com menos de 11h de descanso entre o fim de um turno e o início do próximo. */
+  semInterjornada: number;
+}
+
+/**
+ * Indicadores de jornada para os dashboards (líder/coordenador, RLS já
+ * escopa): quem bate perto de casa, quem passa de 12h num atendimento, e
+ * quem não cumpre as 11h de intervalo entre turnos (interjornada).
+ * "Turno" aqui é entrada -> saída de atendimento aprovada; times "somente
+ * presença" não têm saída registrada, então não entram na interjornada.
+ */
+export async function contarIndicadoresJornada(diasAtras = 30): Promise<IndicadoresJornada> {
+  const desde = new Date();
+  desde.setDate(desde.getDate() - diasAtras);
+  const desdeISO = desde.toISOString().slice(0, 10);
+  const hojeISO = new Date().toISOString().slice(0, 10);
+
+  const [{ data: alertasCasa }, atendimentos] = await Promise.all([
+    supabase
+      .from("alertas")
+      .select("colaborador_id")
+      .eq("tipo", "checkin_proximo_residencia")
+      .gte("created_at", desde.toISOString()),
+    listarRelatorioAtendimentos(desdeISO, hojeISO),
+  ]);
+
+  const pertoDeCasaColaboradores = new Set((alertasCasa ?? []).map((a: { colaborador_id: string | null }) => a.colaborador_id)).size;
+  const mais12h = atendimentos.filter((a) => (a.tempo_total_min ?? 0) > 720).length;
+
+  // Interjornada: agrupa entrada/fim-de-turno por colaborador, em ordem
+  // cronológica, e mede o intervalo entre o fim de um turno e a próxima entrada.
+  const porColaborador = new Map<string, { inicio: number; fim: number }[]>();
+  for (const a of atendimentos) {
+    const inicio = new Date(a.hora_entrada).getTime();
+    const fim = a.hora_saida ? new Date(a.hora_saida).getTime() : inicio;
+    const lista = porColaborador.get(a.colaborador_matricula) ?? [];
+    lista.push({ inicio, fim });
+    porColaborador.set(a.colaborador_matricula, lista);
+  }
+  let semInterjornada = 0;
+  const ONZE_HORAS_MS = 11 * 60 * 60 * 1000;
+  for (const turnos of porColaborador.values()) {
+    turnos.sort((a, b) => a.inicio - b.inicio);
+    for (let i = 1; i < turnos.length; i++) {
+      const intervalo = turnos[i].inicio - turnos[i - 1].fim;
+      if (intervalo >= 0 && intervalo < ONZE_HORAS_MS) {
+        semInterjornada++;
+        break; // conta o colaborador uma vez, não por ocorrência
+      }
+    }
+  }
+
+  return { pertoDeCasaColaboradores, mais12h, semInterjornada };
+}
+
 /**
  * Rejeições: status_dia não guarda um estado "rejeitado" próprio (ele volta
  * para FALTA/FOLGA) — por isso o relatório busca no audit_log a transição

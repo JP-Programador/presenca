@@ -8,12 +8,14 @@ interface MiniMapCardProps {
   carregando?: boolean;
   /** Filtra os pontos exibidos no mapa por nome (ex.: sincronizado com a busca do painel de pendências). */
   filtroNome?: string;
+  /** Marcação em destaque (ex.: clicada numa tabela abaixo) — repassado direto pro PresenceMap. */
+  pontoFoco?: { latitude: number; longitude: number; label?: string } | null;
 }
 
 const ORDEM_RESUMO: StatusDia[] = ["PRESENTE", "PENDENTE", "FALTA", "ATESTADO", "FOLGA", "OUTROS"];
 
 /** Card compacto com o mapa operacional + resumo por status — usado em dashboards menores (líder). */
-export function MiniMapCard({ titulo, pontos, carregando, filtroNome }: MiniMapCardProps) {
+export function MiniMapCard({ titulo, pontos, carregando, filtroNome, pontoFoco }: MiniMapCardProps) {
   const termo = filtroNome?.trim().toLowerCase();
   const pontosFiltrados = termo
     ? pontos.filter((p) => p.colaborador_nome?.toLowerCase().includes(termo))
@@ -42,7 +44,7 @@ export function MiniMapCard({ titulo, pontos, carregando, filtroNome }: MiniMapC
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          <PresenceMap pontos={pontosFiltrados} somenteExibicao altura={200} />
+          <PresenceMap pontos={pontosFiltrados} somenteExibicao altura={200} pontoFoco={pontoFoco} />
         )}
       </CardBody>
     </Card>
