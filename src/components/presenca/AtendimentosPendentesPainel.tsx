@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
 import * as atendimentoService from "@/services/atendimentoService";
 import type { AtendimentoPendente } from "@/services/atendimentoService";
 
@@ -24,6 +25,7 @@ export function AtendimentosPendentesPainel({ somenteLeitura }: AtendimentosPend
   const [itens, setItens] = useState<AtendimentoPendente[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
 
   async function carregar() {
     try {
@@ -43,9 +45,13 @@ export function AtendimentosPendentesPainel({ somenteLeitura }: AtendimentosPend
 
   async function decidir(id: string, aprovar: boolean) {
     setProcessando(id);
+    setErro(null);
     try {
       await (aprovar ? atendimentoService.aprovarSaida(id) : atendimentoService.rejeitarSaida(id));
       setItens((prev) => prev.filter((i) => i.id !== id));
+    } catch (err) {
+      console.error(err);
+      setErro("Não foi possível registrar a decisão. Tente novamente.");
     } finally {
       setProcessando(null);
     }
@@ -62,6 +68,11 @@ export function AtendimentosPendentesPainel({ somenteLeitura }: AtendimentosPend
         </p>
       </CardHeader>
       <CardBody>
+        {erro && (
+          <div className="mb-3">
+            <Alert variant="danger">{erro}</Alert>
+          </div>
+        )}
         <ul className="flex flex-col gap-3">
           {itens.map((item) => (
             <li
