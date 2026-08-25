@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BrandHeader } from "@/components/layout/BrandHeader";
 import { NavPaineis } from "@/components/layout/NavPaineis";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { listarFiliais, listarLideres } from "@/services/coordenacaoService";
 import type { PessoaSimples } from "@/services/coordenacaoService";
 import { listarColaboradores } from "@/services/colaboradoresService";
+import { ALTURA_LISTA_CARDS } from "@/lib/uiConstantes";
 import type { Colaborador, Filial } from "@/types/domain";
 
 export function ColaboradoresGestao() {
@@ -25,6 +26,10 @@ export function ColaboradoresGestao() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [buscaNome, setBuscaNome] = useState("");
+  const [buscaCargo, setBuscaCargo] = useState("");
+  const [buscaLiderId, setBuscaLiderId] = useState("");
+  const [copiado, setCopiado] = useState(false);
 
   async function carregar() {
     setCarregando(true);
@@ -50,6 +55,29 @@ export function ColaboradoresGestao() {
     if (usuario) carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario]);
+
+  const cargos = useMemo(
+    () =>
+      Array.from(new Set(colaboradores.map((c) => c.cargo).filter((cargo): cargo is string => Boolean(cargo)))).sort(),
+    [colaboradores]
+  );
+
+  const filtrados = useMemo(() => {
+    const termo = buscaNome.trim().toLowerCase();
+    return colaboradores.filter((c) => {
+      if (termo && !(c.nome.toLowerCase().includes(termo) || c.matricula.toLowerCase().includes(termo))) return false;
+      if (buscaCargo && c.cargo !== buscaCargo) return false;
+      if (buscaLiderId && c.lider_id !== buscaLiderId) return false;
+      return true;
+    });
+  }, [colaboradores, buscaNome, buscaCargo, buscaLiderId]);
+
+  async function copiarMatriculas() {
+    const texto = filtrados.map((c) => `${c.nome} - ${c.matricula}`).join("\n");
+    await navigator.clipboard.writeText(texto);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
 
   if (!usuario) return null; // narrowing de tipo; na prática nunca alcançado (ver RequireRole)
 
@@ -97,21 +125,62 @@ export function ColaboradoresGestao() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-ink dark:text-white">
-              {ehLider ? "Sua equipe" : "Todos os colaboradores"} ({colaboradores.length})
+              {ehLider ? "Sua equipe" : "Todos os colaboradores"} ({filtrados.length}
+              {filtrados.length !== colaboradores.length ? ` de ${colaboradores.length}` : ""})
             </h2>
+            <Button variant="secondary" size="md" onClick={copiarMatriculas} disabled={filtrados.length === 0}>
+              {copiado ? "Copiado!" : "Copiar nome + matrícula"}
+            </Button>
           </CardHeader>
           <CardBody>
+            <div className="mb-4 flex flex-wrap gap-2">
+              <input
+                value={buscaNome}
+                onChange={(e) => setBuscaNome(e.target.value)}
+                placeholder="Buscar por nome ou matrícula..."
+                className="h-10 flex-1 min-w-[180px] rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+              />
+              <select
+                value={buscaCargo}
+                onChange={(e) => setBuscaCargo(e.target.value)}
+                className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+              >
+                <option value="">Todas as funções</option>
+                {cargos.map((cargo) => (
+                  <option key={cargo} value={cargo}>
+                    {cargo}
+                  </option>
+                ))}
+              </select>
+              {!ehLider && (
+                <select
+                  value={buscaLiderId}
+                  onChange={(e) => setBuscaLiderId(e.target.value)}
+                  className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+                >
+                  <option value="">Todos os líderes</option>
+                  {lideres.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.nome}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             {carregando ? (
               <div className="flex justify-center py-10">
                 <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             ) : colaboradores.length === 0 ? (
               <EmptyState mensagem="Nenhum colaborador cadastrado ainda." />
+            ) : filtrados.length === 0 ? (
+              <EmptyState mensagem="Nenhum colaborador encontrado para esse filtro." />
             ) : (
-              <ul className="divide-y divide-ink/5 dark:divide-white/5">
-                {colaboradores.map((c) => (
+              <ul className={`divide-y divide-ink/5 dark:divide-white/5 ${ALTURA_LISTA_CARDS}`}>
+                {filtrados.map((c) => (
                   <li key={c.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-ink dark:text-white">
