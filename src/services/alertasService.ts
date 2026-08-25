@@ -63,9 +63,11 @@ export async function marcarAlertaComoLido(id: string): Promise<void> {
 export interface CheckinPertoCasa {
   alerta_id: string;
   colaborador_nome: string;
+  colaborador_matricula: string | null;
   distancia_km: number | null;
   tipo_marcacao: string | null;
   data_referencia: string | null;
+  horario_registrado: string | null;
   latitude: number | null;
   longitude: number | null;
 }
@@ -82,7 +84,7 @@ export async function listarCheckinsPertoCasa(diasAtras = 30): Promise<CheckinPe
 
   const { data, error } = await supabase
     .from("alertas")
-    .select("id, detalhes, colaboradores(nome)")
+    .select("id, detalhes, colaboradores(nome, matricula)")
     .eq("tipo", "checkin_proximo_residencia")
     .gte("created_at", desde.toISOString())
     .order("created_at", { ascending: false });
@@ -91,7 +93,7 @@ export async function listarCheckinsPertoCasa(diasAtras = 30): Promise<CheckinPe
   interface LinhaBruta {
     id: string;
     detalhes: Alerta["detalhes"];
-    colaboradores: { nome: string } | null;
+    colaboradores: { nome: string; matricula: string } | null;
   }
   const linhas = (data ?? []) as unknown as LinhaBruta[];
   const idsRegistro = [...new Set(linhas.map((l) => l.detalhes.registro_presenca_id).filter(Boolean))] as string[];
@@ -99,27 +101,31 @@ export async function listarCheckinsPertoCasa(diasAtras = 30): Promise<CheckinPe
 
   const { data: registros } = await supabase
     .from("registros_presenca")
-    .select("id, latitude, longitude")
+    .select("id, latitude, longitude, horario_registrado")
     .in("id", idsRegistro);
-  const coordenadasPorId = new Map(
-    (registros ?? []).map((r: { id: string; latitude: number | null; longitude: number | null }) => [
-      r.id,
-      { latitude: r.latitude, longitude: r.longitude },
-    ])
+  const dadosPorId = new Map(
+    (registros ?? []).map(
+      (r: { id: string; latitude: number | null; longitude: number | null; horario_registrado: string }) => [
+        r.id,
+        { latitude: r.latitude, longitude: r.longitude, horario_registrado: r.horario_registrado },
+      ]
+    )
   );
 
   return linhas
-    .filter((l) => l.detalhes.registro_presenca_id && coordenadasPorId.has(l.detalhes.registro_presenca_id))
+    .filter((l) => l.detalhes.registro_presenca_id && dadosPorId.has(l.detalhes.registro_presenca_id))
     .map((l) => {
-      const coords = coordenadasPorId.get(l.detalhes.registro_presenca_id!)!;
+      const registro = dadosPorId.get(l.detalhes.registro_presenca_id!)!;
       return {
         alerta_id: l.id,
         colaborador_nome: l.colaboradores?.nome ?? "Colaborador",
+        colaborador_matricula: l.colaboradores?.matricula ?? null,
         distancia_km: l.detalhes.distancia_km ?? null,
         tipo_marcacao: l.detalhes.tipo_marcacao ?? null,
         data_referencia: l.detalhes.data_referencia ?? null,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
+        horario_registrado: registro.horario_registrado,
+        latitude: registro.latitude,
+        longitude: registro.longitude,
       };
     });
 }
