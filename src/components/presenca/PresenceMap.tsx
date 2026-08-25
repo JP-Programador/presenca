@@ -53,6 +53,10 @@ export function PresenceMap({
   const [residenciasPorColaborador, setResidenciasPorColaborador] = useState<
     Map<string, { latitude: number; longitude: number } | null>
   >(new Map());
+  // Líder real de cada colaborador (colaboradores.lider_id) — o filtro por
+  // líder precisa disso, não da filial (dois líderes podem dividir a mesma
+  // filial, e aí filtrar só por filial mostra gente de outro líder junto).
+  const [liderIdPorColaborador, setLiderIdPorColaborador] = useState<Map<string, string | null>>(new Map());
   const [filialFiltro, setFilialFiltro] = useState("");
   const [liderFiltro, setLiderFiltro] = useState("");
   const [colaboradorFiltro, setColaboradorFiltro] = useState("");
@@ -69,7 +73,7 @@ export function PresenceMap({
     // Residência cadastrada de cada colaborador — usada só quando o filtro
     // "colaborador" acima é escolhido, pra mostrar a casa (🏠) dele no mapa.
     listarColaboradores()
-      .then((lista) =>
+      .then((lista) => {
         setResidenciasPorColaborador(
           new Map(
             lista.map((c) => [
@@ -77,9 +81,13 @@ export function PresenceMap({
               c.latitude != null && c.longitude != null ? { latitude: c.latitude, longitude: c.longitude } : null,
             ])
           )
-        )
-      )
-      .catch(() => setResidenciasPorColaborador(new Map()));
+        );
+        setLiderIdPorColaborador(new Map(lista.map((c) => [c.id, c.lider_id])));
+      })
+      .catch(() => {
+        setResidenciasPorColaborador(new Map());
+        setLiderIdPorColaborador(new Map());
+      });
   }, [somenteExibicao]);
 
   const filiais = useMemo(() => {
@@ -94,11 +102,6 @@ export function PresenceMap({
     return Array.from(mapa.entries()).map(([id, nome]) => ({ id, nome }));
   }, [lideresPorFilial]);
 
-  const filialIdsDoLider = useMemo(() => {
-    if (!liderFiltro) return null;
-    return new Set(lideresPorFilial.filter((l) => l.lider_id === liderFiltro).map((l) => l.filial_id));
-  }, [lideresPorFilial, liderFiltro]);
-
   const colaboradores = useMemo(() => {
     const mapa = new Map<string, string>();
     pontos
@@ -107,12 +110,12 @@ export function PresenceMap({
       // o próprio filtro de colaborador nem o de nome, senão o select passaria
       // a mostrar só quem já está selecionado).
       .filter((p) => !filialFiltro || p.filial_id === filialFiltro)
-      .filter((p) => !filialIdsDoLider || filialIdsDoLider.has(p.filial_id))
+      .filter((p) => !liderFiltro || liderIdPorColaborador.get(p.colaborador_id) === liderFiltro)
       .forEach((p) => mapa.set(p.colaborador_id, p.colaborador_nome));
     return Array.from(mapa.entries())
       .map(([id, nome]) => ({ id, nome }))
       .sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [pontos, filialFiltro, filialIdsDoLider]);
+  }, [pontos, filialFiltro, liderFiltro, liderIdPorColaborador]);
 
   useEffect(() => {
     if (colaboradorFiltro && !colaboradores.some((c) => c.id === colaboradorFiltro)) {
@@ -156,12 +159,12 @@ export function PresenceMap({
       // localização de check-in e o status manual do líder prevalece.
       if (p.status !== "PRESENTE" && p.status !== "PENDENTE") return false;
       if (filialFiltro && p.filial_id !== filialFiltro) return false;
-      if (filialIdsDoLider && !filialIdsDoLider.has(p.filial_id)) return false;
+      if (liderFiltro && liderIdPorColaborador.get(p.colaborador_id) !== liderFiltro) return false;
       if (colaboradorFiltro && p.colaborador_id !== colaboradorFiltro) return false;
       if (termo && !p.colaborador_nome?.toLowerCase().includes(termo)) return false;
       return true;
     });
-  }, [pontos, trilhaColaborador, filialFiltro, filialIdsDoLider, colaboradorFiltro, nomeFiltro]);
+  }, [pontos, trilhaColaborador, filialFiltro, liderFiltro, liderIdPorColaborador, colaboradorFiltro, nomeFiltro]);
 
   const comCoordenadas = filtrados.filter((p) => p.latitude != null && p.longitude != null);
 
