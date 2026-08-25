@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup, useMap } 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { listarLideresPorFilial, type LiderFilial } from "@/services/mapaOperacionalService";
+import { listarColaboradores } from "@/services/colaboradoresService";
 import { STATUS_DIA_HEX, STATUS_DIA_LABEL, type PontoMapaOperacional } from "@/types/status";
 
 const CENTRO_BRASIL: [number, number] = [-14.235, -51.9253];
@@ -49,6 +50,9 @@ export function PresenceMap({
   pontoFoco,
 }: PresenceMapProps) {
   const [lideresPorFilial, setLideresPorFilial] = useState<LiderFilial[]>([]);
+  const [residenciasPorColaborador, setResidenciasPorColaborador] = useState<
+    Map<string, { latitude: number; longitude: number } | null>
+  >(new Map());
   const [filialFiltro, setFilialFiltro] = useState("");
   const [liderFiltro, setLiderFiltro] = useState("");
   const [colaboradorFiltro, setColaboradorFiltro] = useState("");
@@ -61,6 +65,20 @@ export function PresenceMap({
     listarLideresPorFilial()
       .then(setLideresPorFilial)
       .catch(() => setLideresPorFilial([]));
+    // Residência cadastrada de cada colaborador — usada só quando o filtro
+    // "colaborador" acima é escolhido, pra mostrar a casa (🏠) dele no mapa.
+    listarColaboradores()
+      .then((lista) =>
+        setResidenciasPorColaborador(
+          new Map(
+            lista.map((c) => [
+              c.id,
+              c.latitude != null && c.longitude != null ? { latitude: c.latitude, longitude: c.longitude } : null,
+            ])
+          )
+        )
+      )
+      .catch(() => setResidenciasPorColaborador(new Map()));
   }, [somenteExibicao]);
 
   const filiais = useMemo(() => {
@@ -108,11 +126,17 @@ export function PresenceMap({
 
   const comCoordenadas = filtrados.filter((p) => p.latitude != null && p.longitude != null);
 
+  // Residência do colaborador escolhido no filtro acima (quando existe),
+  // ou a passada explicitamente por fora (ex.: trilha de um colaborador
+  // específico, que já esconde os filtros).
+  const casaDoFiltro = colaboradorFiltro ? residenciasPorColaborador.get(colaboradorFiltro) ?? null : null;
+  const casaFinal = casaColaborador ?? casaDoFiltro;
+
   const centro: [number, number] =
     comCoordenadas.length > 0
       ? [comCoordenadas[0].latitude as number, comCoordenadas[0].longitude as number]
-      : casaColaborador
-        ? [casaColaborador.latitude, casaColaborador.longitude]
+      : casaFinal
+        ? [casaFinal.latitude, casaFinal.longitude]
         : CENTRO_BRASIL;
 
   return (
@@ -169,7 +193,7 @@ export function PresenceMap({
       <div className="overflow-hidden rounded-lg border border-ink/10">
         <MapContainer
           center={centro}
-          zoom={comCoordenadas.length > 0 || casaColaborador ? 11 : 4}
+          zoom={comCoordenadas.length > 0 || casaFinal ? 11 : 4}
           style={{ height: `${altura}px`, width: "100%" }}
           scrollWheelZoom={false}
         >
@@ -178,6 +202,7 @@ export function PresenceMap({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {pontoFoco && <RecentralizarNoFoco foco={pontoFoco} />}
+          {!pontoFoco && casaDoFiltro && <RecentralizarNoFoco foco={casaDoFiltro} />}
           {pontoFoco && (
             <CircleMarker
               center={[pontoFoco.latitude, pontoFoco.longitude]}
@@ -228,8 +253,8 @@ export function PresenceMap({
               </CircleMarker>
             </Fragment>
           ))}
-          {casaColaborador && (
-            <Marker position={[casaColaborador.latitude, casaColaborador.longitude]} icon={ICONE_CASA}>
+          {casaFinal && (
+            <Marker position={[casaFinal.latitude, casaFinal.longitude]} icon={ICONE_CASA}>
               <Popup>
                 <div className="text-xs">
                   <p className="font-semibold">Residência cadastrada</p>
