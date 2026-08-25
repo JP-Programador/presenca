@@ -41,6 +41,7 @@ const ACAO_LABEL: Record<string, string> = {
   atendimento_saida_rejeitada: "Saída de atendimento rejeitada",
   atendimento_pendente_fechamento: "Alerta: atendimento pendente de fechamento (8h)",
   atendimento_sem_fechamento: "Alerta: atendimento sem fechamento (12h)",
+  atendimento_saida_cancelada_por_status_dia: "Saída de atendimento cancelada (status do dia alterado)",
 };
 
 export function AuditoriaDashboard() {
