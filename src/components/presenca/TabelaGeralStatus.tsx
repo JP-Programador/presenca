@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { hojeISO } from "@/lib/calendario";
-import { ALTURA_TABELA_COMPACTA } from "@/lib/uiConstantes";
 import * as statusDiaService from "@/services/statusDiaService";
 import { ExportButtons } from "@/components/ui/ExportButtons";
 import { TabelaMensalStatus } from "@/components/presenca/TabelaMensalStatus";
@@ -54,6 +53,27 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
+  // Barra de rolagem horizontal duplicada em cima da tabela (só desktop) —
+  // evita ter que rolar pra baixo até achar a barra de baixo pra ir pro
+  // lado. As duas ficam sincronizadas entre si.
+  const tabelaScrollRef = useRef<HTMLDivElement>(null);
+  const topoScrollRef = useRef<HTMLDivElement>(null);
+  const [larguraConteudo, setLarguraConteudo] = useState(0);
+  const sincronizandoRef = useRef<"topo" | "tabela" | null>(null);
+
+  function rolarDoTopo(e: React.UIEvent<HTMLDivElement>) {
+    if (sincronizandoRef.current === "tabela") return;
+    sincronizandoRef.current = "topo";
+    if (tabelaScrollRef.current) tabelaScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    sincronizandoRef.current = null;
+  }
+  function rolarDaTabela(e: React.UIEvent<HTMLDivElement>) {
+    if (sincronizandoRef.current === "topo") return;
+    sincronizandoRef.current = "tabela";
+    if (topoScrollRef.current) topoScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    sincronizandoRef.current = null;
+  }
+
   useEffect(() => {
     if (visualizacao !== "lista") return;
     setCarregando(true);
@@ -93,6 +113,13 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
       })),
     [filtradas]
   );
+
+  // Recalcula a largura real da tabela pra barra de cima ter o que rolar —
+  // roda depois do DOM atualizar com as linhas novas.
+  useEffect(() => {
+    const largura = tabelaScrollRef.current?.scrollWidth ?? 0;
+    setLarguraConteudo(largura);
+  }, [filtradas, carregando]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -174,7 +201,21 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
               <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           ) : (
-            <div className={`overflow-x-auto rounded-lg border border-ink/10 dark:border-white/10 ${ALTURA_TABELA_COMPACTA}`}>
+            <>
+              {/* Barra de rolagem horizontal duplicada em cima — só desktop, só quando a tabela é mais larga que o container. */}
+              <div
+                ref={topoScrollRef}
+                onScroll={rolarDoTopo}
+                className="mb-1 hidden overflow-x-auto overflow-y-hidden sm:block"
+                style={{ height: 14 }}
+              >
+                <div style={{ width: larguraConteudo, height: 1 }} />
+              </div>
+              <div
+                ref={tabelaScrollRef}
+                onScroll={rolarDaTabela}
+                className="overflow-x-auto rounded-lg border border-ink/10 dark:border-white/10 sm:max-h-[440px] sm:overflow-y-auto"
+              >
               <table className="w-full min-w-[420px] text-left text-sm">
                 <thead className="sticky top-0 bg-white dark:bg-[#242424]">
                   <tr className="border-b border-ink/10 bg-surface text-xs uppercase tracking-wide text-ink/50 dark:border-white/10 dark:bg-white/5 dark:text-white/50">
@@ -203,7 +244,8 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
                   )}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </>
       )}
