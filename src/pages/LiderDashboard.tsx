@@ -11,7 +11,8 @@ import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosP
 import { TabelaMarcacoes } from "@/components/presenca/TabelaMarcacoes";
 import { TabelaCheckinsPertoCasa } from "@/components/presenca/TabelaCheckinsPertoCasa";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
-import { MiniMapCard } from "@/components/presenca/MiniMapCard";
+import { PresenceMap } from "@/components/presenca/PresenceMap";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
 import { useAuth } from "@/providers/AuthProvider";
 import { hojeISO } from "@/lib/calendario";
@@ -231,7 +232,17 @@ export function LiderDashboard() {
           <div className="flex flex-col gap-3">
             {aba === "status_dia" && (
               <div className="mb-4 flex flex-col gap-4">
-                <MiniMapCard titulo="Mapa da filial (hoje)" pontos={pontosMapa} filtroNome={buscaNome} pontoFoco={pontoFoco} />
+                <Card>
+                  <CardHeader>
+                    <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa da equipe (hoje)</h2>
+                    <p className="text-xs text-ink/50 dark:text-white/50">
+                      Filtre por colaborador pra ver a localização do check-in e a residência cadastrada (🏠) dele.
+                    </p>
+                  </CardHeader>
+                  <CardBody>
+                    <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} pontoFoco={pontoFoco} altura={320} />
+                  </CardBody>
+                </Card>
                 <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
               </div>
             )}
@@ -294,11 +305,20 @@ export function LiderDashboard() {
 
             {aba === "geral" && (
               <>
-                <MiniMapCard
-                  titulo="Mapa da filial"
-                  pontos={pontosMapaGeral}
-                  carregando={carregandoMapaGeral}
-                />
+                <Card className="mb-4">
+                  <CardHeader>
+                    <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa da equipe</h2>
+                  </CardHeader>
+                  <CardBody>
+                    {carregandoMapaGeral ? (
+                      <div className="flex h-[320px] items-center justify-center rounded-lg border border-ink/10 bg-surface">
+                        <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    ) : (
+                      <PresenceMap pontos={pontosMapaGeral} altura={320} />
+                    )}
+                  </CardBody>
+                </Card>
                 <TabelaGeralStatus data={dataGeral} onDataChange={setDataGeral} />
               </>
             )}
