@@ -279,8 +279,8 @@ export function PresenceMap({
                 <Popup>
                   <div className="text-xs">
                     <p className="font-semibold">{p.colaborador_nome}</p>
-                    <p>{p.filial_nome}</p>
                     <p>{STATUS_DIA_LABEL[p.status]}</p>
+                    {p.endereco_completo && <p>{p.endereco_completo}</p>}
                     {p.horario_registrado && (
                       <p>
                         {new Date(p.horario_registrado).toLocaleString("pt-BR", {

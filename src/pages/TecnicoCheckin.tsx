@@ -24,7 +24,6 @@ export function TecnicoCheckin() {
   const [statusValidacao, setStatusValidacao] = useState<StatusValidacao>("vazio");
   const [nomeEncontrado, setNomeEncontrado] = useState<string | null>(null);
   const [liderNome, setLiderNome] = useState<string | null>(null);
-  const [equipe, setEquipe] = useState<string | null>(null);
   const [exigeSaida, setExigeSaida] = useState(false);
   const [proximaMarcacao, setProximaMarcacao] = useState<"entrada" | "saida">("entrada");
   const [enviando, setEnviando] = useState(false);
@@ -64,7 +63,6 @@ export function TecnicoCheckin() {
         setStatusValidacao("encontrado");
         setNomeEncontrado(resposta.nome ?? null);
         setLiderNome(resposta.lider_nome ?? null);
-        setEquipe(resposta.equipe ?? null);
         setExigeSaida(resposta.exige_saida ?? false);
         setProximaMarcacao(resposta.proxima_marcacao ?? "entrada");
         if (camera.status === "idle") camera.iniciar();
@@ -198,12 +196,8 @@ export function TecnicoCheckin() {
                 {statusValidacao === "encontrado" && nomeEncontrado && (
                   <div className="text-sm">
                     <p className="font-semibold text-[#2E7D32]">✓ {nomeEncontrado}</p>
-                    {(liderNome || equipe) && (
-                      <p className="text-xs text-ink/50 dark:text-white/50">
-                        {liderNome && <>Líder: {liderNome}</>}
-                        {liderNome && equipe && " · "}
-                        {equipe && <>Equipe: {equipe}</>}
-                      </p>
+                    {liderNome && (
+                      <p className="text-xs text-ink/50 dark:text-white/50">Líder: {liderNome}</p>
                     )}
                   </div>
                 )}

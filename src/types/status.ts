@@ -115,4 +115,5 @@ export interface PontoMapaOperacional {
   longitude: number | null;
   precisao_metros: number | null;
   horario_registrado: string | null;
+  endereco_completo: string | null;
 }

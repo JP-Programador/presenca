@@ -6,7 +6,7 @@ export async function listarMapaOperacional(dataISO: string): Promise<PontoMapaO
   const { data, error } = await supabase
     .from("vw_mapa_operacional")
     .select(
-      "status_dia_id, colaborador_id, filial_id, data_referencia, status, colaborador_nome, colaborador_matricula, filial_nome, latitude, longitude, precisao_metros, horario_registrado"
+      "status_dia_id, colaborador_id, filial_id, data_referencia, status, colaborador_nome, colaborador_matricula, filial_nome, latitude, longitude, precisao_metros, horario_registrado, endereco_completo"
     )
     .eq("data_referencia", dataISO);
 
@@ -23,7 +23,7 @@ export async function listarMapaOperacionalPeriodo(
   const { data, error } = await supabase
     .from("vw_mapa_operacional")
     .select(
-      "status_dia_id, colaborador_id, filial_id, data_referencia, status, colaborador_nome, colaborador_matricula, filial_nome, latitude, longitude, precisao_metros, horario_registrado"
+      "status_dia_id, colaborador_id, filial_id, data_referencia, status, colaborador_nome, colaborador_matricula, filial_nome, latitude, longitude, precisao_metros, horario_registrado, endereco_completo"
     )
     .gte("data_referencia", inicioISO)
     .lte("data_referencia", fimISO)
