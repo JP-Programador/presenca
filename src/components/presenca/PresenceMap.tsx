@@ -102,11 +102,22 @@ export function PresenceMap({
     const mapa = new Map<string, string>();
     pontos
       .filter((p) => p.status === "PRESENTE" || p.status === "PENDENTE")
+      // Mesmos filtros de filial/líder da lista de pontos no mapa (não inclui
+      // o próprio filtro de colaborador nem o de nome, senão o select passaria
+      // a mostrar só quem já está selecionado).
+      .filter((p) => !filialFiltro || p.filial_id === filialFiltro)
+      .filter((p) => !filialIdsDoLider || filialIdsDoLider.has(p.filial_id))
       .forEach((p) => mapa.set(p.colaborador_id, p.colaborador_nome));
     return Array.from(mapa.entries())
       .map(([id, nome]) => ({ id, nome }))
       .sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [pontos]);
+  }, [pontos, filialFiltro, filialIdsDoLider]);
+
+  useEffect(() => {
+    if (colaboradorFiltro && !colaboradores.some((c) => c.id === colaboradorFiltro)) {
+      setColaboradorFiltro("");
+    }
+  }, [colaboradores, colaboradorFiltro]);
 
   const filtrados = useMemo(() => {
     const termo = (nomeFiltro ?? "").trim().toLowerCase();
