@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { listarLideresPorFilial, type LiderFilial } from "@/services/mapaOperacionalService";
+import { listarLideresPorFilial, listarMapaOperacionalPeriodo, type LiderFilial } from "@/services/mapaOperacionalService";
 import { listarColaboradores } from "@/services/colaboradoresService";
 import { STATUS_DIA_HEX, STATUS_DIA_LABEL, type PontoMapaOperacional } from "@/types/status";
 
@@ -56,6 +56,7 @@ export function PresenceMap({
   const [filialFiltro, setFilialFiltro] = useState("");
   const [liderFiltro, setLiderFiltro] = useState("");
   const [colaboradorFiltro, setColaboradorFiltro] = useState("");
+  const [trilhaColaborador, setTrilhaColaborador] = useState<PontoMapaOperacional[] | null>(null);
   const [nomeFiltroInterno, setNomeFiltroInterno] = useState("");
   const nomeFiltroControlado = filtroNomeExterno !== undefined;
   const nomeFiltro = nomeFiltroControlado ? filtroNomeExterno : nomeFiltroInterno;
@@ -119,9 +120,36 @@ export function PresenceMap({
     }
   }, [colaboradores, colaboradorFiltro]);
 
+  // Selecionou um colaborador no filtro: mostra todas as marcações dele no
+  // mês corrente (não só o snapshot de hoje que a tela já tinha carregado),
+  // pra dar a "trilha" completa junto com a casa (🏠).
+  useEffect(() => {
+    if (!colaboradorFiltro) {
+      setTrilhaColaborador(null);
+      return;
+    }
+    const hoje = new Date();
+    const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-01`;
+    const hojeISO = hoje.toISOString().slice(0, 10);
+    let cancelado = false;
+    listarMapaOperacionalPeriodo(inicioMes, hojeISO, colaboradorFiltro)
+      .then((lista) => {
+        if (!cancelado) setTrilhaColaborador(lista);
+      })
+      .catch(() => {
+        if (!cancelado) setTrilhaColaborador([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [colaboradorFiltro]);
+
   const filtrados = useMemo(() => {
     const termo = (nomeFiltro ?? "").trim().toLowerCase();
-    return pontos.filter((p) => {
+    // Com um colaborador selecionado, mostra a trilha do mês inteiro (todas
+    // as marcações dele) em vez de só o snapshot de hoje.
+    const base = colaboradorFiltro && trilhaColaborador ? trilhaColaborador : pontos;
+    return base.filter((p) => {
       // O mapa mostra quem fez check-in de verdade (Presente ou aguardando
       // aprovação, ambos com GPS do próprio check-in). Se o líder marcou
       // Falta/Atestado/Folga/Outros manualmente, some do mapa — esses não têm
@@ -133,7 +161,7 @@ export function PresenceMap({
       if (termo && !p.colaborador_nome?.toLowerCase().includes(termo)) return false;
       return true;
     });
-  }, [pontos, filialFiltro, filialIdsDoLider, colaboradorFiltro, nomeFiltro]);
+  }, [pontos, trilhaColaborador, filialFiltro, filialIdsDoLider, colaboradorFiltro, nomeFiltro]);
 
   const comCoordenadas = filtrados.filter((p) => p.latitude != null && p.longitude != null);
 

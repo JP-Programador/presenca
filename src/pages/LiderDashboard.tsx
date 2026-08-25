@@ -236,7 +236,7 @@ export function LiderDashboard() {
                   <CardHeader>
                     <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa da equipe (hoje)</h2>
                     <p className="text-xs text-ink/50 dark:text-white/50">
-                      Filtre por colaborador pra ver a localização do check-in e a residência cadastrada (🏠) dele.
+                      Filtre por colaborador pra ver todas as marcações dele no mês e a residência cadastrada (🏠).
                     </p>
                   </CardHeader>
                   <CardBody>
