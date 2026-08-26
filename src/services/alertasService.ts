@@ -33,6 +33,21 @@ export interface Alerta {
   lido: boolean;
   created_at: string;
   colaborador_nome?: string;
+  /** ids de todas as cópias desse mesmo evento (líder + coordenador recebem alertas separados) — usado pra marcar todas como lidas de uma vez. */
+  ids_relacionados: string[];
+}
+
+/**
+ * Chave de deduplicação de um alerta: o mesmo evento gera uma linha por
+ * destinatário (líder e coordenador), e quem enxerga todos os alertas
+ * (gerente/admin/auditor, via RLS) via de ver as duas linhas. Usa o que
+ * identifica o evento em si — registro_presenca_id quando existe, senão o
+ * período das férias.
+ */
+function chaveDedupe(row: Pick<Alerta, "tipo" | "colaborador_id" | "detalhes">): string {
+  const d = row.detalhes;
+  const identificador = d.registro_presenca_id ?? `${d.data_inicio ?? ""}:${d.data_fim ?? ""}`;
+  return `${row.tipo}:${row.colaborador_id}:${identificador}`;
 }
 
 const SELECT_COLUNAS = "id, tipo, colaborador_id, detalhes, lido, created_at, colaboradores(nome)";
@@ -41,7 +56,14 @@ interface AlertaRowBruta extends Omit<Alerta, "colaborador_nome"> {
   colaboradores: { nome: string } | null;
 }
 
-/** Lista os alertas não lidos endereçados ao usuário logado (RLS já restringe a destinatario_id = auth.uid()). */
+/**
+ * Lista os alertas não lidos endereçados ao usuário logado — RLS restringe
+ * a destinatario_id = auth.uid() para líder/coordenador, mas gerente/admin/
+ * auditor enxergam TODOS os alertas (visão global), o que inclui as duas
+ * cópias do mesmo evento (uma pro líder, outra pro coordenador). Dedupe
+ * por evento antes de devolver, guardando os ids das cópias pra marcar
+ * lido em bloco.
+ */
 export async function listarAlertasNaoLidos(): Promise<Alerta[]> {
   const { data, error } = await supabase
     .from("alertas")
@@ -49,14 +71,28 @@ export async function listarAlertasNaoLidos(): Promise<Alerta[]> {
     .eq("lido", false)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return ((data ?? []) as unknown as AlertaRowBruta[]).map((row) => ({
+
+  const linhas = ((data ?? []) as unknown as AlertaRowBruta[]).map((row) => ({
     ...row,
     colaborador_nome: row.colaboradores?.nome,
   }));
+
+  const porChave = new Map<string, Alerta>();
+  for (const linha of linhas) {
+    const chave = chaveDedupe(linha);
+    const existente = porChave.get(chave);
+    if (existente) {
+      existente.ids_relacionados.push(linha.id);
+    } else {
+      porChave.set(chave, { ...linha, ids_relacionados: [linha.id] });
+    }
+  }
+  return Array.from(porChave.values());
 }
 
-export async function marcarAlertaComoLido(id: string): Promise<void> {
-  const { error } = await supabase.from("alertas").update({ lido: true }).eq("id", id);
+/** Marca como lido o alerta e todas as cópias do mesmo evento (líder + coordenador). */
+export async function marcarAlertaComoLido(idsRelacionados: string[]): Promise<void> {
+  const { error } = await supabase.from("alertas").update({ lido: true }).in("id", idsRelacionados);
   if (error) throw error;
 }
 

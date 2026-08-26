@@ -50,11 +50,11 @@ export function AlertasCard() {
     return () => clearInterval(intervalo);
   }, []);
 
-  async function marcarComoLido(id: string) {
-    setMarcando(id);
+  async function marcarComoLido(a: Alerta) {
+    setMarcando(a.id);
     try {
-      await alertasService.marcarAlertaComoLido(id);
-      setAlertas((prev) => prev.filter((a) => a.id !== id));
+      await alertasService.marcarAlertaComoLido(a.ids_relacionados);
+      setAlertas((prev) => prev.filter((item) => item.id !== a.id));
     } finally {
       setMarcando(null);
     }
@@ -91,7 +91,7 @@ export function AlertasCard() {
                 size="md"
                 disabled={marcando === a.id}
                 loading={marcando === a.id}
-                onClick={() => marcarComoLido(a.id)}
+                onClick={() => marcarComoLido(a)}
               >
                 Marcar como lido
               </Button>
