@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -41,6 +41,8 @@ interface PresenceMapProps {
   casaColaborador?: { latitude: number; longitude: number } | null;
   /** Marcação em destaque (ex.: clicada numa tabela) — centraliza/zoom o mapa nela e desenha um marcador diferenciado, sem esconder os demais pontos. */
   pontoFoco?: { latitude: number; longitude: number; label?: string } | null;
+  /** Renderiza ações extras dentro do popup de cada marcador (ex.: Aprovar/Rejeitar quando o ponto está PENDENTE) — evita o líder ter que sair do mapa pra decidir. */
+  renderAcoesPopup?: (ponto: PontoMapaOperacional) => ReactNode;
 }
 
 /** Recentraliza o mapa quando o ponto em destaque muda (MapContainer só lê center/zoom no mount). */
@@ -60,6 +62,7 @@ export function PresenceMap({
   filtroNomeExterno,
   casaColaborador,
   pontoFoco,
+  renderAcoesPopup,
 }: PresenceMapProps) {
   const [lideresPorFilial, setLideresPorFilial] = useState<LiderFilial[]>([]);
   const [residenciasPorColaborador, setResidenciasPorColaborador] = useState<
@@ -313,6 +316,7 @@ export function PresenceMap({
                       </p>
                     )}
                     {p.precisao_metros != null && <p>Precisão do GPS: ±{Math.round(p.precisao_metros)}m</p>}
+                    {renderAcoesPopup && <div className="mt-2">{renderAcoesPopup(p)}</div>}
                   </div>
                   </Popup>
               </CircleMarker>

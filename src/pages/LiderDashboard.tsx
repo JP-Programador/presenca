@@ -12,6 +12,7 @@ import { TabelaMarcacoes } from "@/components/presenca/TabelaMarcacoes";
 import { TabelaCheckinsPertoCasa } from "@/components/presenca/TabelaCheckinsPertoCasa";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { PresenceMap } from "@/components/presenca/PresenceMap";
+import { AcoesPopupMapa } from "@/components/presenca/AcoesPopupMapa";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
 import { SeletorPeriodoMapa, type ModoMapa } from "@/components/presenca/SeletorPeriodoMapa";
@@ -286,7 +287,8 @@ export function LiderDashboard() {
                     <div>
                       <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa da equipe</h2>
                       <p className="text-xs text-ink/50 dark:text-white/50">
-                        Filtre por colaborador pra ver todas as marcações dele no período e a residência cadastrada (🏠).
+                        Clique numa marcação pendente pra aprovar ou rejeitar direto por aqui. Filtre por
+                        colaborador pra ver todas as marcações dele no período e a residência cadastrada (🏠).
                       </p>
                     </div>
                     <SeletorPeriodoMapa
@@ -304,11 +306,38 @@ export function LiderDashboard() {
                         <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                       </div>
                     ) : (
-                      <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} pontoFoco={pontoFoco} altura={320} />
+                      <PresenceMap
+                        pontos={pontosMapa}
+                        filtroNomeExterno={buscaNome}
+                        pontoFoco={pontoFoco}
+                        altura={320}
+                        renderAcoesPopup={
+                          ehAuditor
+                            ? undefined
+                            : (ponto) => {
+                                const row = statusDoDia.find((s) => s.id === ponto.status_dia_id);
+                                if (!row) return null;
+                                return (
+                                  <AcoesPopupMapa
+                                    row={row}
+                                    onAprovar={() =>
+                                      aplicarEventoStatusDia(row, () =>
+                                        statusDiaService.aplicarEvento(row, { tipo: "APROVAR" })
+                                      )
+                                    }
+                                    onRejeitar={() =>
+                                      aplicarEventoStatusDia(row, () =>
+                                        statusDiaService.aplicarEvento(row, { tipo: "REJEITAR" })
+                                      )
+                                    }
+                                  />
+                                );
+                              }
+                        }
+                      />
                     )}
                   </CardBody>
                 </Card>
-                <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
               </div>
             )}
 
@@ -366,6 +395,12 @@ export function LiderDashboard() {
                       )
                 }
               />
+            )}
+
+            {aba === "status_dia" && (
+              <div className="mt-4">
+                <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
+              </div>
             )}
 
             {aba === "geral" && (

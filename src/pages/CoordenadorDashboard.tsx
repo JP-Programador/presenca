@@ -11,6 +11,7 @@ import { AlertasCard } from "@/components/presenca/AlertasCard";
 import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
 import { TabelaMarcacoes } from "@/components/presenca/TabelaMarcacoes";
 import { TabelaCheckinsPertoCasa } from "@/components/presenca/TabelaCheckinsPertoCasa";
+import { AcoesPopupMapa } from "@/components/presenca/AcoesPopupMapa";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
 import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
@@ -269,8 +270,8 @@ export function CoordenadorDashboard() {
             <div>
               <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa operacional</h2>
               <p className="text-xs text-ink/50 dark:text-white/50">
-                Status do dia de cada colaborador, com localização quando disponível. A busca por nome é a mesma do
-                painel de pendências, mais abaixo.
+                Clique numa marcação pendente pra aprovar ou rejeitar direto por aqui. A busca por nome é a mesma
+                do painel de pendências, mais abaixo.
               </p>
             </div>
             <SeletorPeriodoMapa
@@ -286,12 +287,37 @@ export function CoordenadorDashboard() {
             {carregandoMapa ? (
               <MapaCarregando />
             ) : (
-              <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} pontoFoco={pontoFoco} />
+              <PresenceMap
+                pontos={pontosMapa}
+                filtroNomeExterno={buscaNome}
+                pontoFoco={pontoFoco}
+                renderAcoesPopup={
+                  ehAuditor
+                    ? undefined
+                    : (ponto) => {
+                        const row = statusDoDia.find((s) => s.id === ponto.status_dia_id);
+                        if (!row) return null;
+                        return (
+                          <AcoesPopupMapa
+                            row={row}
+                            onAprovar={() =>
+                              aplicarEventoStatusDia(row, () =>
+                                statusDiaService.aplicarEvento(row, { tipo: "APROVAR" })
+                              )
+                            }
+                            onRejeitar={() =>
+                              aplicarEventoStatusDia(row, () =>
+                                statusDiaService.aplicarEvento(row, { tipo: "REJEITAR" })
+                              )
+                            }
+                          />
+                        );
+                      }
+                }
+              />
             )}
           </CardBody>
         </Card>
-
-        <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
 
         <TabelaMarcacoes />
 
@@ -437,6 +463,8 @@ export function CoordenadorDashboard() {
             )}
           </CardBody>
         </Card>
+
+        <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
       </main>
     </div>
   );
