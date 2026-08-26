@@ -51,3 +51,33 @@ async function decidirSaida(id: string, aprovar: boolean): Promise<void> {
 
 export const aprovarSaida = (id: string) => decidirSaida(id, true);
 export const rejeitarSaida = (id: string) => decidirSaida(id, false);
+
+export interface SaidaAtendimentoMapa {
+  id: string;
+  horario_registrado: string;
+  latitude: number;
+  longitude: number;
+  endereco_completo: string | null;
+  status_aprovacao: "pendente" | "aprovado" | "rejeitado";
+}
+
+/**
+ * Saídas de atendimento de um colaborador num período — usado no mapa pra
+ * plotar junto com as entradas (são marcações distintas, não um trajeto:
+ * a saída é onde ele bateu o ponto de saída, não necessariamente o último
+ * endereço atendido no dia).
+ */
+export async function listarSaidasPeriodo(
+  inicioISO: string,
+  fimISO: string,
+  colaboradorId: string
+): Promise<SaidaAtendimentoMapa[]> {
+  const { data, error } = await supabase
+    .from("marcacoes_atendimento")
+    .select("id, horario_registrado, latitude, longitude, endereco_completo, status_aprovacao")
+    .eq("colaborador_id", colaboradorId)
+    .gte("data_referencia", inicioISO)
+    .lte("data_referencia", fimISO);
+  if (error) throw error;
+  return (data ?? []) as SaidaAtendimentoMapa[];
+}

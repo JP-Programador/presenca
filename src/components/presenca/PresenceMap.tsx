@@ -4,6 +4,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { listarLideresPorFilial, listarMapaOperacionalPeriodo, type LiderFilial } from "@/services/mapaOperacionalService";
 import { listarColaboradores } from "@/services/colaboradoresService";
+import { listarSaidasPeriodo, type SaidaAtendimentoMapa } from "@/services/atendimentoService";
+import { formatarDataHoraBR } from "@/lib/formato";
 import { STATUS_DIA_HEX, STATUS_DIA_LABEL, type PontoMapaOperacional } from "@/types/status";
 
 const CENTRO_BRASIL: [number, number] = [-14.235, -51.9253];
@@ -15,6 +17,16 @@ const ICONE_CASA = L.divIcon({
   className: "",
   iconSize: [22, 22],
   iconAnchor: [11, 11],
+});
+
+// Saída de atendimento é uma marcação diferente da entrada (não é "onde ele
+// terminou o dia", é só onde bateu o ponto de saída) — ícone próprio pra não
+// confundir com os pontos de entrada/presença.
+const ICONE_SAIDA = L.divIcon({
+  html: '<div style="font-size: 20px; line-height: 1;">🏁</div>',
+  className: "",
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
 });
 
 interface PresenceMapProps {
@@ -61,6 +73,7 @@ export function PresenceMap({
   const [liderFiltro, setLiderFiltro] = useState("");
   const [colaboradorFiltro, setColaboradorFiltro] = useState("");
   const [trilhaColaborador, setTrilhaColaborador] = useState<PontoMapaOperacional[] | null>(null);
+  const [saidasColaborador, setSaidasColaborador] = useState<SaidaAtendimentoMapa[]>([]);
   const [nomeFiltroInterno, setNomeFiltroInterno] = useState("");
   const nomeFiltroControlado = filtroNomeExterno !== undefined;
   const nomeFiltro = nomeFiltroControlado ? filtroNomeExterno : nomeFiltroInterno;
@@ -125,10 +138,13 @@ export function PresenceMap({
 
   // Selecionou um colaborador no filtro: mostra todas as marcações dele no
   // mês corrente (não só o snapshot de hoje que a tela já tinha carregado),
-  // pra dar a "trilha" completa junto com a casa (🏠).
+  // pra dar a "trilha" completa junto com a casa (🏠) — e também as saídas
+  // de atendimento do período (marcação separada, ícone próprio: não é o
+  // último endereço atendido, é só onde ele bateu a saída).
   useEffect(() => {
     if (!colaboradorFiltro) {
       setTrilhaColaborador(null);
+      setSaidasColaborador([]);
       return;
     }
     const hoje = new Date();
@@ -141,6 +157,13 @@ export function PresenceMap({
       })
       .catch(() => {
         if (!cancelado) setTrilhaColaborador([]);
+      });
+    listarSaidasPeriodo(inicioMes, hojeISO, colaboradorFiltro)
+      .then((lista) => {
+        if (!cancelado) setSaidasColaborador(lista);
+      })
+      .catch(() => {
+        if (!cancelado) setSaidasColaborador([]);
       });
     return () => {
       cancelado = true;
@@ -304,6 +327,25 @@ export function PresenceMap({
               </Popup>
             </Marker>
           )}
+          {colaboradorFiltro &&
+            saidasColaborador.map((s) => (
+              <Marker key={s.id} position={[s.latitude, s.longitude]} icon={ICONE_SAIDA}>
+                <Popup>
+                  <div className="text-xs">
+                    <p className="font-semibold">Saída de atendimento</p>
+                    <p>{formatarDataHoraBR(s.horario_registrado)}</p>
+                    {s.endereco_completo && <p>{s.endereco_completo}</p>}
+                    <p className="mt-1 text-ink/50">
+                      {s.status_aprovacao === "aprovado"
+                        ? "Aprovada"
+                        : s.status_aprovacao === "rejeitado"
+                          ? "Rejeitada"
+                          : "Pendente"}
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
         </MapContainer>
       </div>
     </div>
