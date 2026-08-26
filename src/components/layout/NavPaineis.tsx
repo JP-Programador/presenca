@@ -4,7 +4,7 @@ import { BotaoHabilitarNotificacoes } from "@/components/presenca/BotaoHabilitar
 import type { PerfilAcesso } from "@/types/domain";
 
 const VISAO_GLOBAL: PerfilAcesso[] = ["admin", "gerente", "auditor", "coordenador"];
-const NOTIFICACOES: PerfilAcesso[] = ["gestor", "coordenador"];
+const NOTIFICACOES: PerfilAcesso[] = ["gestor", "coordenador", "admin"];
 const AUDITORIA: PerfilAcesso[] = ["admin", "auditor"];
 const GESTAO_USUARIOS: PerfilAcesso[] = ["admin", "gerente", "coordenador"];
 const GESTAO_COLABORADORES: PerfilAcesso[] = ["admin", "gerente", "coordenador", "gestor"];

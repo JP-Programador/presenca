@@ -3,7 +3,8 @@
 // Chamada pelo pg_cron (6 horários — ver migration 0066) pra mandar
 // lembretes de "quem não lançou" via Web Push:
 //   - líder: 08:00/08:30/09:00 (lembrete) e 09:15 (final, já em FALTA)
-//   - coordenador: 08:30 (lembrete) e 09:15 (final)
+//   - coordenador + admin: 08:30 (lembrete) e 09:15 (final) — coordenador
+//     vê a própria hierarquia, admin vê a soma de todos os líderes
 // Nunca mexe em status_dia nem em "alertas" — é só notificação no navegador.
 //
 // Protegida por um segredo compartilhado (query param ?secret=) em vez de
@@ -97,6 +98,13 @@ Deno.serve(async (req) => {
     const { data: linhas, error } = await supabase.rpc("resumo_nao_lancaram_por_coordenador");
     if (error) return json({ error: error.message }, 500);
 
+    function textoResumo(lideresPendentes: number, totalColaboradores: number, colaboradoresPendentes: number) {
+      const percentual = totalColaboradores > 0 ? Math.round((colaboradoresPendentes / totalColaboradores) * 100) : 0;
+      const titulo = fase === "final" ? "Resumo de pendências" : "Líderes com pendência";
+      const corpo = `${lideresPendentes} líder(es) com pendência — ${percentual}% da equipe ainda não lançou.`;
+      return { titulo, corpo };
+    }
+
     for (const linha of (linhas ?? []) as {
       coordenador_id: string;
       lideres_pendentes: number;
@@ -104,11 +112,26 @@ Deno.serve(async (req) => {
       colaboradores_pendentes: number;
     }[]) {
       if (linha.lideres_pendentes === 0) continue;
-      const percentual =
-        linha.total_colaboradores > 0 ? Math.round((linha.colaboradores_pendentes / linha.total_colaboradores) * 100) : 0;
-      const titulo = fase === "final" ? "Resumo de pendências" : "Líderes com pendência";
-      const corpo = `${linha.lideres_pendentes} líder(es) com pendência — ${percentual}% da equipe ainda não lançou.`;
+      const { titulo, corpo } = textoResumo(linha.lideres_pendentes, linha.total_colaboradores, linha.colaboradores_pendentes);
       await notificarDestinatario(linha.coordenador_id, titulo, corpo);
+    }
+
+    // Admin recebe a mesma ideia do coordenador, mas somando TODOS os
+    // líderes do sistema (ele não é coordenador de ninguém especificamente).
+    const { data: geral } = await supabase.rpc("resumo_nao_lancaram_geral").single();
+    const resumoGeral = geral as
+      | { lideres_pendentes: number; total_colaboradores: number; colaboradores_pendentes: number }
+      | null;
+    if (resumoGeral && resumoGeral.lideres_pendentes > 0) {
+      const { titulo, corpo } = textoResumo(
+        resumoGeral.lideres_pendentes,
+        resumoGeral.total_colaboradores,
+        resumoGeral.colaboradores_pendentes
+      );
+      const { data: admins } = await supabase.from("perfis").select("id").eq("perfil", "admin").eq("ativo", true);
+      for (const admin of admins ?? []) {
+        await notificarDestinatario(admin.id, titulo, corpo);
+      }
     }
   }
 
