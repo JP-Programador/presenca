@@ -3,6 +3,9 @@ project_id = "tlp-presenca-operacional"
 [functions.delete-old-photos]
 verify_jwt = false
 
+[functions.enviar-notificacoes-push]
+verify_jwt = false
+
 [functions.checkin-publico]
 verify_jwt = false
 

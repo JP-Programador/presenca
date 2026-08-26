@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
+import { BotaoHabilitarNotificacoes } from "@/components/presenca/BotaoHabilitarNotificacoes";
 import type { PerfilAcesso } from "@/types/domain";
 
 const VISAO_GLOBAL: PerfilAcesso[] = ["admin", "gerente", "auditor", "coordenador"];
+const NOTIFICACOES: PerfilAcesso[] = ["gestor", "coordenador"];
 const AUDITORIA: PerfilAcesso[] = ["admin", "auditor"];
 const GESTAO_USUARIOS: PerfilAcesso[] = ["admin", "gerente", "coordenador"];
 const GESTAO_COLABORADORES: PerfilAcesso[] = ["admin", "gerente", "coordenador", "gestor"];
@@ -54,6 +56,7 @@ export function NavPaineis({
           Usuários
         </Link>
       )}
+      {NOTIFICACOES.includes(perfil) && <BotaoHabilitarNotificacoes />}
       <Button variant="ghost" size="md" onClick={onSair}>
         Sair
       </Button>
