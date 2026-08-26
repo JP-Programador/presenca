@@ -112,20 +112,27 @@ export async function listarCheckinsPertoCasa(diasAtras = 30): Promise<CheckinPe
     )
   );
 
-  return linhas
-    .filter((l) => l.detalhes.registro_presenca_id && dadosPorId.has(l.detalhes.registro_presenca_id))
-    .map((l) => {
-      const registro = dadosPorId.get(l.detalhes.registro_presenca_id!)!;
-      return {
-        alerta_id: l.id,
-        colaborador_nome: l.colaboradores?.nome ?? "Colaborador",
-        colaborador_matricula: l.colaboradores?.matricula ?? null,
-        distancia_km: l.detalhes.distancia_km ?? null,
-        tipo_marcacao: l.detalhes.tipo_marcacao ?? null,
-        data_referencia: l.detalhes.data_referencia ?? null,
-        horario_registrado: registro.horario_registrado,
-        latitude: registro.latitude,
-        longitude: registro.longitude,
-      };
+  // Cada check-in perto de casa gera um alerta pro líder E outro pro
+  // coordenador (mesmo evento, dois destinatários) — dedupe por
+  // registro_presenca_id pra não listar o mesmo check-in duas vezes.
+  const vistos = new Set<string>();
+  const resultado: CheckinPertoCasa[] = [];
+  for (const l of linhas) {
+    const idRegistro = l.detalhes.registro_presenca_id;
+    if (!idRegistro || !dadosPorId.has(idRegistro) || vistos.has(idRegistro)) continue;
+    vistos.add(idRegistro);
+    const registro = dadosPorId.get(idRegistro)!;
+    resultado.push({
+      alerta_id: l.id,
+      colaborador_nome: l.colaboradores?.nome ?? "Colaborador",
+      colaborador_matricula: l.colaboradores?.matricula ?? null,
+      distancia_km: l.detalhes.distancia_km ?? null,
+      tipo_marcacao: l.detalhes.tipo_marcacao ?? null,
+      data_referencia: l.detalhes.data_referencia ?? null,
+      horario_registrado: registro.horario_registrado,
+      latitude: registro.latitude,
+      longitude: registro.longitude,
     });
+  }
+  return resultado;
 }
