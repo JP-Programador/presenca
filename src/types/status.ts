@@ -21,6 +21,10 @@ export type MotivoOutros =
   | "Afastamento"
   | "Banco de horas"
   | "Plantão não escalado"
+  | "Frota"
+  | "Exame periódico"
+  | "Bloqueado IHS"
+  | "Base"
   | "Outro";
 
 export const MOTIVOS_OUTROS: MotivoOutros[] = [
@@ -29,8 +33,40 @@ export const MOTIVOS_OUTROS: MotivoOutros[] = [
   "Afastamento",
   "Banco de horas",
   "Plantão não escalado",
+  "Frota",
+  "Exame periódico",
+  "Bloqueado IHS",
+  "Base",
   "Outro",
 ];
+
+/** Sigla de 2 letras por motivo — usada só na tabela resumo mensal (grade), pra bater o olho rápido. */
+export const SIGLA_MOTIVO: Record<MotivoOutros, string> = {
+  Férias: "FE",
+  Afastamento: "AF",
+  Frota: "FT",
+  "Exame periódico": "EX",
+  "Bloqueado IHS": "BQ",
+  Base: "BA",
+  "Banco de horas": "BH",
+  "Plantão não escalado": "PL",
+  Treinamento: "TR",
+  Outro: "OT",
+};
+
+/** Cor por motivo — mesma tabela resumo mensal, uma cor distinta por linha. */
+export const COR_MOTIVO: Record<MotivoOutros, string> = {
+  Férias: "bg-[#FFF9DB] text-[#8A6D00]",
+  Afastamento: "bg-[#F1E7FB] text-[#6A3FA0]",
+  Frota: "bg-[#E7F3E8] text-[#2E7D32]",
+  "Exame periódico": "bg-[#E3EEFA] text-[#1E6FA8]",
+  "Bloqueado IHS": "bg-[#F6D9D9] text-[#8A1F1F]",
+  Base: "bg-[#E4ECF1] text-[#3B5A6B]",
+  "Banco de horas": "bg-[#E5E4FA] text-[#4B4699]",
+  "Plantão não escalado": "bg-[#FDE8D6] text-[#A85E1B]",
+  Treinamento: "bg-[#D9F3F3] text-[#1B7A7A]",
+  Outro: "bg-surface text-ink/60 dark:bg-white/10 dark:text-white/60",
+};
 
 export interface StatusDiaRegistro {
   id: string;

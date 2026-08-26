@@ -3,7 +3,14 @@ import { intervaloDeDatas } from "@/lib/calendario";
 import * as statusDiaService from "@/services/statusDiaService";
 import { exportarCSV, exportarExcel } from "@/services/exportService";
 import { Button } from "@/components/ui/Button";
-import { STATUS_DIA_LABEL, type StatusDia, type StatusDiaRegistro } from "@/types/status";
+import {
+  STATUS_DIA_LABEL,
+  SIGLA_MOTIVO,
+  COR_MOTIVO,
+  MOTIVOS_OUTROS,
+  type StatusDia,
+  type StatusDiaRegistro,
+} from "@/types/status";
 
 const SIGLA: Record<StatusDia, string> = {
   PRESENTE: "P",
@@ -22,6 +29,18 @@ const CORES: Record<StatusDia, string> = {
   FOLGA: "bg-surface text-ink/60 dark:bg-white/10 dark:text-white/60",
   OUTROS: "bg-surface text-ink/60 dark:bg-white/10 dark:text-white/60",
 };
+
+/** Sigla/cor de uma célula: quando é OUTROS com motivo reconhecido, usa a sigla específica do motivo; senão cai no padrão do status. */
+function siglaCelula(item: StatusDiaRegistro): { sigla: string; cor: string; titulo: string } {
+  if (item.status === "OUTROS" && item.motivo_outros) {
+    return {
+      sigla: SIGLA_MOTIVO[item.motivo_outros],
+      cor: COR_MOTIVO[item.motivo_outros],
+      titulo: item.motivo_outros,
+    };
+  }
+  return { sigla: SIGLA[item.status], cor: CORES[item.status], titulo: STATUS_DIA_LABEL[item.status] };
+}
 
 interface LinhaColaborador {
   colaborador_id: string;
@@ -96,7 +115,7 @@ export function TabelaMensalStatus({ nomeFiltro }: TabelaMensalStatusProps) {
       const linha: Record<string, string> = { nome: c.nome };
       for (const d of dias) {
         const item = c.porDia.get(d);
-        linha[d] = item ? SIGLA[item.status] : "";
+        linha[d] = item ? siglaCelula(item).sigla : "";
       }
       return linha;
     });
@@ -125,10 +144,20 @@ export function TabelaMensalStatus({ nomeFiltro }: TabelaMensalStatusProps) {
       </div>
 
       <div className="flex flex-wrap gap-3 text-xs text-ink/60 dark:text-white/60">
-        {(Object.keys(SIGLA) as StatusDia[]).map((s) => (
-          <span key={s} className="flex items-center gap-1">
-            <span className={["rounded px-1.5 py-0.5 font-semibold", CORES[s]].join(" ")}>{SIGLA[s]}</span>
-            {STATUS_DIA_LABEL[s]}
+        {(Object.keys(SIGLA) as StatusDia[])
+          .filter((s) => s !== "OUTROS")
+          .map((s) => (
+            <span key={s} className="flex items-center gap-1">
+              <span className={["rounded px-1.5 py-0.5 font-semibold", CORES[s]].join(" ")}>{SIGLA[s]}</span>
+              {STATUS_DIA_LABEL[s]}
+            </span>
+          ))}
+        {MOTIVOS_OUTROS.map((motivo) => (
+          <span key={motivo} className="flex items-center gap-1">
+            <span className={["rounded px-1.5 py-0.5 font-semibold", COR_MOTIVO[motivo]].join(" ")}>
+              {SIGLA_MOTIVO[motivo]}
+            </span>
+            {motivo}
           </span>
         ))}
       </div>
@@ -172,16 +201,18 @@ export function TabelaMensalStatus({ nomeFiltro }: TabelaMensalStatusProps) {
                   </td>
                   {dias.map((d) => {
                     const item = c.porDia.get(d);
+                    const celula = item ? siglaCelula(item) : null;
                     return (
                       <td key={d} className="px-2 py-2 text-center">
-                        {item ? (
+                        {celula ? (
                           <span
-                            className={["inline-flex h-6 min-w-[26px] items-center justify-center rounded px-1 text-xs font-bold", CORES[item.status]].join(
-                              " "
-                            )}
-                            title={STATUS_DIA_LABEL[item.status]}
+                            className={[
+                              "inline-flex h-6 min-w-[26px] items-center justify-center rounded px-1 text-xs font-bold",
+                              celula.cor,
+                            ].join(" ")}
+                            title={celula.titulo}
                           >
-                            {SIGLA[item.status]}
+                            {celula.sigla}
                           </span>
                         ) : (
                           <span className="text-ink/20 dark:text-white/20">·</span>
