@@ -38,6 +38,7 @@ export function LiderDashboard() {
   const [exigeSaidaAtendimento, setExigeSaidaAtendimento] = useState(usuario?.exige_saida_atendimento ?? false);
   const [pontoFoco, setPontoFoco] = useState<{ latitude: number; longitude: number; label?: string } | null>(null);
   const [indicadores, setIndicadores] = useState<IndicadoresJornada | null>(null);
+  const [dataPendencias, setDataPendencias] = useState(hojeISO());
 
   // Mapa da aba "Status do dia": alterna entre "Dia" (snapshot, como sempre
   // foi) e "Mês" (todas as marcações do mês, mesmos filtros de sempre).
@@ -52,12 +53,12 @@ export function LiderDashboard() {
   const [pontosMapaGeral, setPontosMapaGeral] = useState<PontoMapaOperacional[]>([]);
   const [carregandoMapaGeral, setCarregandoMapaGeral] = useState(true);
 
-  async function carregar() {
-    setCarregandoLista(true);
+  async function carregar(silencioso = false) {
+    if (!silencioso) setCarregandoLista(true);
     setErro(null);
     try {
       const [statusDia, totalEscalados] = await Promise.all([
-        statusDiaService.listarStatusDia(hojeISO()),
+        statusDiaService.listarStatusDia(dataPendencias),
         contarColaboradoresAtivos(),
       ]);
       setStatusDoDia(statusDia);
@@ -65,7 +66,7 @@ export function LiderDashboard() {
     } catch (err) {
       setErro("Não foi possível carregar as pendências. Atualize a página.");
     } finally {
-      setCarregandoLista(false);
+      if (!silencioso) setCarregandoLista(false);
     }
   }
 
@@ -108,7 +109,8 @@ export function LiderDashboard() {
 
   useEffect(() => {
     if (usuario) carregar();
-  }, [usuario]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, dataPendencias]);
 
   useEffect(() => {
     if (usuario) carregarMapa();
@@ -130,16 +132,13 @@ export function LiderDashboard() {
   useEffect(() => {
     if (!usuario) return;
     const intervalo = setInterval(() => {
-      statusDiaService
-        .listarStatusDia(hojeISO())
-        .then(setStatusDoDia)
-        .catch(() => {});
+      if (dataPendencias === hojeISO()) carregar(true);
       if (modoMapa === "dia" ? dataMapa === hojeISO() : mesMapa === mesAtualISO()) carregarMapa(true);
       if (dataGeral === hojeISO()) carregarMapaGeral(true);
     }, 60_000);
     return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, modoMapa, dataMapa, mesMapa, dataGeral]);
+  }, [usuario, dataPendencias, modoMapa, dataMapa, mesMapa, dataGeral]);
 
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
@@ -246,6 +245,31 @@ export function LiderDashboard() {
         {erro && (
           <div className="mb-4">
             <Alert variant="danger">{erro}</Alert>
+          </div>
+        )}
+
+        {aba === "status_dia" && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-ink/50 dark:text-white/50">
+              Pendências de aprovação de outro dia (ex.: alguém que não lançou ontem) também aparecem aqui.
+            </p>
+            <input
+              type="date"
+              value={dataPendencias}
+              max={hojeISO()}
+              onChange={(e) => setDataPendencias(e.target.value)}
+              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+            />
+          </div>
+        )}
+
+        {aba === "status_dia" && dataPendencias !== hojeISO() && (
+          <div className="mb-4">
+            <Alert variant="warning">
+              Os cards e a lista abaixo estão mostrando{" "}
+              {new Date(`${dataPendencias}T00:00:00`).toLocaleDateString("pt-BR")}, não hoje — mude a data acima pra
+              voltar.
+            </Alert>
           </div>
         )}
 
