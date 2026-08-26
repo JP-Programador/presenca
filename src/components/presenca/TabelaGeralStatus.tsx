@@ -49,6 +49,7 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
   const setData = onDataChange ?? setDataInterna;
   const [status, setStatus] = useState<StatusDia | "">("");
   const [nome, setNome] = useState("");
+  const [lider, setLider] = useState("");
   const [linhas, setLinhas] = useState<StatusDiaRegistro[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -94,14 +95,21 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
     return () => clearInterval(intervalo);
   }, [data, visualizacao]);
 
+  const lideres = useMemo(() => {
+    const nomes = new Set<string>();
+    linhas.forEach((l) => l.lider_nome && nomes.add(l.lider_nome));
+    return Array.from(nomes).sort();
+  }, [linhas]);
+
   const filtradas = useMemo(() => {
     const termo = nome.trim().toLowerCase();
     return linhas.filter((l) => {
       if (status && l.status !== status) return false;
+      if (lider && l.lider_nome !== lider) return false;
       if (termo && !l.colaborador_nome?.toLowerCase().includes(termo)) return false;
       return true;
     });
-  }, [linhas, status, nome]);
+  }, [linhas, status, lider, nome]);
 
   const dadosExportacao = useMemo(
     () =>
@@ -110,6 +118,7 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
         filial: l.filial_nome ?? "",
         status: STATUS_DIA_LABEL[l.status],
         data: l.data_referencia,
+        lider: l.lider_nome ?? "",
       })),
     [filtradas]
   );
@@ -180,6 +189,20 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
                   </option>
                 ))}
               </select>
+              {lideres.length > 0 && (
+                <select
+                  value={lider}
+                  onChange={(e) => setLider(e.target.value)}
+                  className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+                >
+                  <option value="">Todos os líderes</option>
+                  {lideres.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <ExportButtons
@@ -190,6 +213,7 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
                 { chave: "filial", titulo: "Filial" },
                 { chave: "status", titulo: "Status" },
                 { chave: "data", titulo: "Data" },
+                { chave: "lider", titulo: "Líder" },
               ]}
             />
           </div>
@@ -222,12 +246,13 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
                     <th className="px-4 py-2">Nome</th>
                     <th className="px-4 py-2">Filial</th>
                     <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">Líder</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtradas.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-ink/50 dark:text-white/50">
+                      <td colSpan={4} className="px-4 py-8 text-center text-ink/50 dark:text-white/50">
                         Nenhum resultado para esse filtro.
                       </td>
                     </tr>
@@ -239,6 +264,7 @@ export function TabelaGeralStatus({ data: dataControlada, onDataChange }: Tabela
                         </td>
                         <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">{l.filial_nome ?? "—"}</td>
                         <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">{STATUS_DIA_LABEL[l.status]}</td>
+                        <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">{l.lider_nome ?? "—"}</td>
                       </tr>
                     ))
                   )}

@@ -88,6 +88,7 @@ export interface StatusDiaRegistro {
   filial_nome?: string;
   decidido_por_nome?: string;
   foto_path?: string | null;
+  lider_nome?: string | null;
 }
 
 export const STATUS_DIA_LABEL: Record<StatusDia, string> = {

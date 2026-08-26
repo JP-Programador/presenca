@@ -3,20 +3,20 @@ import { transicionar, type EventoStatusDia } from "@/lib/statusMachine";
 import type { StatusDiaRegistro } from "@/types/status";
 
 const SELECT_COLUNAS =
-  "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores(nome, matricula), filiais(nome), registros_presenca(foto_path)";
+  "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores(nome, matricula, lider:perfis!lider_id(nome)), filiais(nome), registros_presenca(foto_path)";
 
 // Mesmas colunas, mas com colaboradores!inner + ativo — usada nas listagens
 // (pendências/dashboards), pra excluir colaboradores desligados: uma vez
 // desativado, ninguém deveria ver o status dele nessas telas.
 const SELECT_COLUNAS_ATIVOS =
-  "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores!inner(nome, matricula, ativo), filiais(nome), registros_presenca(foto_path)";
+  "id, colaborador_id, filial_id, data_referencia, tipo_dia, status, registro_presenca_id, motivo_outros, observacao, decidido_por, decidido_em, created_at, updated_at, colaboradores!inner(nome, matricula, ativo, lider:perfis!lider_id(nome)), filiais(nome), registros_presenca(foto_path)";
 
 interface StatusDiaRowBruta
   extends Omit<
     StatusDiaRegistro,
-    "colaborador_nome" | "colaborador_matricula" | "filial_nome" | "decidido_por_nome" | "foto_path"
+    "colaborador_nome" | "colaborador_matricula" | "filial_nome" | "decidido_por_nome" | "foto_path" | "lider_nome"
   > {
-  colaboradores: { nome: string; matricula: string } | null;
+  colaboradores: { nome: string; matricula: string; lider: { nome: string } | null } | null;
   filiais: { nome: string } | null;
   registros_presenca: { foto_path: string | null } | null;
 }
@@ -28,6 +28,7 @@ function mapearLinha(row: StatusDiaRowBruta): StatusDiaRegistro {
     colaborador_matricula: row.colaboradores?.matricula,
     filial_nome: row.filiais?.nome,
     foto_path: row.registros_presenca?.foto_path ?? null,
+    lider_nome: row.colaboradores?.lider?.nome ?? null,
   };
 }
 
