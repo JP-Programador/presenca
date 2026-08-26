@@ -41,10 +41,11 @@ export function LiderDashboard() {
   const [indicadores, setIndicadores] = useState<IndicadoresJornada | null>(null);
   const [dataPendencias, setDataPendencias] = useState(hojeISO());
 
-  // Mapa da aba "Status do dia": alterna entre "Dia" (snapshot, como sempre
-  // foi) e "Mês" (todas as marcações do mês, mesmos filtros de sempre).
+  // Mapa da aba "Status do dia": alterna entre "Dia" (snapshot) e "Mês"
+  // (todas as marcações do mês, mesmos filtros de sempre). No modo "Dia", a
+  // data é a MESMA de "Pendências de aprovação" (dataPendencias) — mudar
+  // uma muda a outra, sempre sincronizadas.
   const [modoMapa, setModoMapa] = useState<ModoMapa>("dia");
-  const [dataMapa, setDataMapa] = useState(hojeISO());
   const [mesMapa, setMesMapa] = useState(mesAtualISO());
   const [carregandoMapa, setCarregandoMapa] = useState(true);
 
@@ -78,7 +79,7 @@ export function LiderDashboard() {
         const { inicio, fim } = intervaloDoMes(mesMapa);
         setPontosMapa(await listarMapaOperacionalPeriodo(inicio, fim));
       } else {
-        setPontosMapa(await listarMapaOperacional(dataMapa));
+        setPontosMapa(await listarMapaOperacional(dataPendencias));
       }
     } catch {
       setErro("Não foi possível carregar o mapa.");
@@ -116,7 +117,7 @@ export function LiderDashboard() {
   useEffect(() => {
     if (usuario) carregarMapa();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, modoMapa, dataMapa, mesMapa]);
+  }, [usuario, modoMapa, dataPendencias, mesMapa]);
 
   useEffect(() => {
     if (usuario) contarIndicadoresJornada(30).then(setIndicadores).catch(() => {});
@@ -134,12 +135,12 @@ export function LiderDashboard() {
     if (!usuario) return;
     const intervalo = setInterval(() => {
       if (dataPendencias === hojeISO()) carregar(true);
-      if (modoMapa === "dia" ? dataMapa === hojeISO() : mesMapa === mesAtualISO()) carregarMapa(true);
+      if (modoMapa === "dia" ? dataPendencias === hojeISO() : mesMapa === mesAtualISO()) carregarMapa(true);
       if (dataGeral === hojeISO()) carregarMapaGeral(true);
     }, 60_000);
     return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, dataPendencias, modoMapa, dataMapa, mesMapa, dataGeral]);
+  }, [usuario, dataPendencias, modoMapa, mesMapa, dataGeral]);
 
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
@@ -294,8 +295,8 @@ export function LiderDashboard() {
                     <SeletorPeriodoMapa
                       modo={modoMapa}
                       onModoChange={setModoMapa}
-                      data={dataMapa}
-                      onDataChange={setDataMapa}
+                      data={dataPendencias}
+                      onDataChange={setDataPendencias}
                       mes={mesMapa}
                       onMesChange={setMesMapa}
                     />

@@ -55,28 +55,35 @@ export function TabelaMarcacoes() {
       </CardHeader>
       <CardBody>
         <div className={`overflow-x-auto rounded-lg border border-ink/10 dark:border-white/10 ${ALTURA_TABELA_COMPACTA}`}>
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="sticky top-0 bg-white dark:bg-[#242424]">
               <tr className="border-b border-ink/10 bg-surface text-xs uppercase tracking-wide text-ink/50 dark:border-white/10 dark:bg-white/5 dark:text-white/50">
                 <th className="px-4 py-2">Colaborador</th>
+                <th className="px-4 py-2">Matrícula</th>
                 <th className="px-4 py-2">Líder</th>
                 <th className="px-4 py-2">Entrada</th>
+                <th className="px-4 py-2">Endereço entrada</th>
                 <th className="px-4 py-2">Saída</th>
+                <th className="px-4 py-2">Endereço saída</th>
                 <th className="px-4 py-2">Tempo total</th>
                 <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2">Alertas</th>
               </tr>
             </thead>
             <tbody>
               {linhas.map((l) => (
                 <tr key={l.registro_presenca_id} className="border-b border-ink/5 last:border-0 dark:border-white/5">
                   <td className="px-4 py-2.5 font-medium text-ink dark:text-white">{l.colaborador_nome}</td>
+                  <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">{l.colaborador_matricula}</td>
                   <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">{l.lider_nome ?? "—"}</td>
                   <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">
                     {formatarDataBR(l.data_entrada)} {formatarHoraBR(l.hora_entrada)}
                   </td>
+                  <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">{l.endereco_entrada ?? "—"}</td>
                   <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">
                     {l.hora_saida ? `${formatarDataBR(l.data_saida)} ${formatarHoraBR(l.hora_saida)}` : "—"}
                   </td>
+                  <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">{l.endereco_saida ?? "—"}</td>
                   <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">
                     {l.tempo_total_min != null ? `${Math.floor(l.tempo_total_min / 60)}h${String(l.tempo_total_min % 60).padStart(2, "0")}` : "—"}
                   </td>
@@ -85,6 +92,7 @@ export function TabelaMarcacoes() {
                       {STATUS_LABEL[l.status]}
                     </span>
                   </td>
+                  <td className="px-4 py-2.5 text-ink/60 dark:text-white/60">{l.alertas_gerados}</td>
                 </tr>
               ))}
             </tbody>
