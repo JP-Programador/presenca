@@ -17,6 +17,24 @@ export function hojeISO(): string {
   return formatarDataISO(new Date());
 }
 
+/** "YYYY-MM" do mês atual. */
+export function mesAtualISO(): string {
+  return hojeISO().slice(0, 7);
+}
+
+/**
+ * Intervalo [início, fim] de um mês "YYYY-MM" pra consultas de período —
+ * o fim nunca passa de hoje (evita pedir dado de data futura no mês atual).
+ */
+export function intervaloDoMes(mesISO: string): { inicio: string; fim: string } {
+  const inicio = `${mesISO}-01`;
+  const [ano, mes] = mesISO.split("-").map(Number);
+  const ultimoDia = new Date(ano, mes, 0).getDate(); // dia 0 do mês seguinte = último dia deste
+  const fimDoMes = `${mesISO}-${String(ultimoDia).padStart(2, "0")}`;
+  const fim = fimDoMes > hojeISO() ? hojeISO() : fimDoMes;
+  return { inicio, fim };
+}
+
 /** 0 = domingo ... 6 = sábado, a partir de uma data "YYYY-MM-DD". */
 function diaDaSemana(dataISO: string): number {
   const [ano, mes, dia] = dataISO.split("-").map(Number);

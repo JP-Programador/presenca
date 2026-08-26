@@ -15,11 +15,12 @@ import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
 import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
+import { SeletorPeriodoMapa, type ModoMapa } from "@/components/presenca/SeletorPeriodoMapa";
 import { useAuth } from "@/providers/AuthProvider";
-import { hojeISO } from "@/lib/calendario";
+import { hojeISO, mesAtualISO, intervaloDoMes } from "@/lib/calendario";
 import { listarRankingLideres } from "@/services/coordenacaoService";
 import * as statusDiaService from "@/services/statusDiaService";
-import { listarMapaOperacional } from "@/services/mapaOperacionalService";
+import { listarMapaOperacional, listarMapaOperacionalPeriodo } from "@/services/mapaOperacionalService";
 import { contarColaboradoresAtivos } from "@/services/colaboradoresService";
 import { listarSlaStatusDia, mediaDiaria, mediaMensal, ranquearPorLider } from "@/services/slaService";
 import { contarIndicadoresJornada, type IndicadoresJornada } from "@/services/relatoriosService";
@@ -34,6 +35,8 @@ export function CoordenadorDashboard() {
   const [statusDoDia, setStatusDoDia] = useState<StatusDiaRegistro[]>([]);
   const [carregandoPendencias, setCarregandoPendencias] = useState(true);
   const [dataMapa, setDataMapa] = useState(hojeISO());
+  const [modoMapa, setModoMapa] = useState<ModoMapa>("dia");
+  const [mesMapa, setMesMapa] = useState(mesAtualISO());
   const [pontosMapa, setPontosMapa] = useState<PontoMapaOperacional[]>([]);
   const [carregandoMapa, setCarregandoMapa] = useState(true);
   const [decisoesSla, setDecisoesSla] = useState<SlaStatusDia[]>([]);
@@ -68,7 +71,12 @@ export function CoordenadorDashboard() {
   async function carregarMapa(silencioso = false) {
     if (!silencioso) setCarregandoMapa(true);
     try {
-      setPontosMapa(await listarMapaOperacional(dataMapa));
+      if (modoMapa === "mes") {
+        const { inicio, fim } = intervaloDoMes(mesMapa);
+        setPontosMapa(await listarMapaOperacionalPeriodo(inicio, fim));
+      } else {
+        setPontosMapa(await listarMapaOperacional(dataMapa));
+      }
     } catch {
       setErro("Não foi possível carregar o mapa operacional.");
     } finally {
@@ -109,7 +117,7 @@ export function CoordenadorDashboard() {
   useEffect(() => {
     if (usuario) carregarMapa();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, dataMapa]);
+  }, [usuario, dataMapa, modoMapa, mesMapa]);
 
   useEffect(() => {
     if (usuario) carregarPendencias();
@@ -124,12 +132,14 @@ export function CoordenadorDashboard() {
     if (!usuario) return;
     const intervalo = setInterval(() => {
       carregar(true);
-      if (dataMapa === hojeISO()) carregarMapa(true);
+      // Dia: só atualiza sozinho se a data escolhida é hoje. Mês: só se o
+      // mês escolhido é o atual (mês passado não muda mais).
+      if (modoMapa === "dia" ? dataMapa === hojeISO() : mesMapa === mesAtualISO()) carregarMapa(true);
       if (dataPendencias === hojeISO()) carregarPendencias(true);
     }, 60_000);
     return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, dataMapa, dataPendencias]);
+  }, [usuario, dataMapa, modoMapa, mesMapa, dataPendencias]);
 
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
@@ -263,12 +273,13 @@ export function CoordenadorDashboard() {
                 painel de pendências, mais abaixo.
               </p>
             </div>
-            <input
-              type="date"
-              value={dataMapa}
-              max={hojeISO()}
-              onChange={(e) => setDataMapa(e.target.value)}
-              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+            <SeletorPeriodoMapa
+              modo={modoMapa}
+              onModoChange={setModoMapa}
+              data={dataMapa}
+              onDataChange={setDataMapa}
+              mes={mesMapa}
+              onMesChange={setMesMapa}
             />
           </CardHeader>
           <CardBody>

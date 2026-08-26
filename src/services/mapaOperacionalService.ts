@@ -14,21 +14,28 @@ export async function listarMapaOperacional(dataISO: string): Promise<PontoMapaO
   return (data ?? []) as PontoMapaOperacional[];
 }
 
-/** Mesmos pontos, mas de um colaborador específico ao longo de um período (base da "trilha" no dashboard de presença). */
+/**
+ * Mesmos pontos, mas ao longo de um período — de um colaborador específico
+ * (base da "trilha" no dashboard de presença e no filtro do mapa
+ * operacional), ou de todo mundo (visão "Mês" do mapa operacional, quando
+ * colaboradorId é omitido).
+ */
 export async function listarMapaOperacionalPeriodo(
   inicioISO: string,
   fimISO: string,
-  colaboradorId: string
+  colaboradorId?: string
 ): Promise<PontoMapaOperacional[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("vw_mapa_operacional")
     .select(
       "status_dia_id, colaborador_id, filial_id, data_referencia, status, colaborador_nome, colaborador_matricula, filial_nome, latitude, longitude, precisao_metros, horario_registrado, endereco_completo"
     )
     .gte("data_referencia", inicioISO)
-    .lte("data_referencia", fimISO)
-    .eq("colaborador_id", colaboradorId);
+    .lte("data_referencia", fimISO);
 
+  if (colaboradorId) query = query.eq("colaborador_id", colaboradorId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as PontoMapaOperacional[];
 }

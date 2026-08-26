@@ -14,10 +14,11 @@ import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { PresenceMap } from "@/components/presenca/PresenceMap";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
+import { SeletorPeriodoMapa, type ModoMapa } from "@/components/presenca/SeletorPeriodoMapa";
 import { useAuth } from "@/providers/AuthProvider";
-import { hojeISO } from "@/lib/calendario";
+import { hojeISO, mesAtualISO, intervaloDoMes } from "@/lib/calendario";
 import * as statusDiaService from "@/services/statusDiaService";
-import { listarMapaOperacional } from "@/services/mapaOperacionalService";
+import { listarMapaOperacional, listarMapaOperacionalPeriodo } from "@/services/mapaOperacionalService";
 import { contarColaboradoresAtivos } from "@/services/colaboradoresService";
 import { contarIndicadoresJornada, type IndicadoresJornada } from "@/services/relatoriosService";
 import type { MotivoOutros, PontoMapaOperacional, StatusDiaRegistro } from "@/types/status";
@@ -38,6 +39,13 @@ export function LiderDashboard() {
   const [pontoFoco, setPontoFoco] = useState<{ latitude: number; longitude: number; label?: string } | null>(null);
   const [indicadores, setIndicadores] = useState<IndicadoresJornada | null>(null);
 
+  // Mapa da aba "Status do dia": alterna entre "Dia" (snapshot, como sempre
+  // foi) e "Mês" (todas as marcações do mês, mesmos filtros de sempre).
+  const [modoMapa, setModoMapa] = useState<ModoMapa>("dia");
+  const [dataMapa, setDataMapa] = useState(hojeISO());
+  const [mesMapa, setMesMapa] = useState(mesAtualISO());
+  const [carregandoMapa, setCarregandoMapa] = useState(true);
+
   // Aba "Geral": data selecionável (não fixa em hoje) e o mapa dessa aba
   // segue a mesma data escolhida na tabela.
   const [dataGeral, setDataGeral] = useState(hojeISO());
@@ -48,18 +56,32 @@ export function LiderDashboard() {
     setCarregandoLista(true);
     setErro(null);
     try {
-      const [statusDia, pontos, totalEscalados] = await Promise.all([
+      const [statusDia, totalEscalados] = await Promise.all([
         statusDiaService.listarStatusDia(hojeISO()),
-        listarMapaOperacional(hojeISO()),
         contarColaboradoresAtivos(),
       ]);
       setStatusDoDia(statusDia);
-      setPontosMapa(pontos);
       setEscalados(totalEscalados);
     } catch (err) {
       setErro("Não foi possível carregar as pendências. Atualize a página.");
     } finally {
       setCarregandoLista(false);
+    }
+  }
+
+  async function carregarMapa(silencioso = false) {
+    if (!silencioso) setCarregandoMapa(true);
+    try {
+      if (modoMapa === "mes") {
+        const { inicio, fim } = intervaloDoMes(mesMapa);
+        setPontosMapa(await listarMapaOperacionalPeriodo(inicio, fim));
+      } else {
+        setPontosMapa(await listarMapaOperacional(dataMapa));
+      }
+    } catch {
+      setErro("Não foi possível carregar o mapa.");
+    } finally {
+      if (!silencioso) setCarregandoMapa(false);
     }
   }
 
@@ -89,6 +111,11 @@ export function LiderDashboard() {
   }, [usuario]);
 
   useEffect(() => {
+    if (usuario) carregarMapa();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, modoMapa, dataMapa, mesMapa]);
+
+  useEffect(() => {
     if (usuario) contarIndicadoresJornada(30).then(setIndicadores).catch(() => {});
   }, [usuario]);
 
@@ -107,14 +134,12 @@ export function LiderDashboard() {
         .listarStatusDia(hojeISO())
         .then(setStatusDoDia)
         .catch(() => {});
-      listarMapaOperacional(hojeISO())
-        .then(setPontosMapa)
-        .catch(() => {});
+      if (modoMapa === "dia" ? dataMapa === hojeISO() : mesMapa === mesAtualISO()) carregarMapa(true);
       if (dataGeral === hojeISO()) carregarMapaGeral(true);
     }, 60_000);
     return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario, dataGeral]);
+  }, [usuario, modoMapa, dataMapa, mesMapa, dataGeral]);
 
   const metricas = useMemo(() => {
     const presentes = statusDoDia.filter((s) => s.status === "PRESENTE").length;
@@ -233,14 +258,30 @@ export function LiderDashboard() {
             {aba === "status_dia" && (
               <div className="mb-4 flex flex-col gap-4">
                 <Card>
-                  <CardHeader>
-                    <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa da equipe (hoje)</h2>
-                    <p className="text-xs text-ink/50 dark:text-white/50">
-                      Filtre por colaborador pra ver todas as marcações dele no mês e a residência cadastrada (🏠).
-                    </p>
+                  <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa da equipe</h2>
+                      <p className="text-xs text-ink/50 dark:text-white/50">
+                        Filtre por colaborador pra ver todas as marcações dele no período e a residência cadastrada (🏠).
+                      </p>
+                    </div>
+                    <SeletorPeriodoMapa
+                      modo={modoMapa}
+                      onModoChange={setModoMapa}
+                      data={dataMapa}
+                      onDataChange={setDataMapa}
+                      mes={mesMapa}
+                      onMesChange={setMesMapa}
+                    />
                   </CardHeader>
                   <CardBody>
-                    <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} pontoFoco={pontoFoco} altura={320} />
+                    {carregandoMapa ? (
+                      <div className="flex h-[320px] items-center justify-center rounded-lg border border-ink/10 bg-surface">
+                        <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    ) : (
+                      <PresenceMap pontos={pontosMapa} filtroNomeExterno={buscaNome} pontoFoco={pontoFoco} altura={320} />
+                    )}
                   </CardBody>
                 </Card>
                 <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
