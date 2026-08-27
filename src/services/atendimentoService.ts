@@ -8,6 +8,7 @@ export interface AtendimentoPendente {
   latitude: number;
   longitude: number;
   endereco_completo: string | null;
+  foto_path: string | null;
   status_aprovacao: "pendente" | "aprovado" | "rejeitado";
   colaborador_nome?: string;
   colaborador_matricula?: string;
@@ -15,7 +16,7 @@ export interface AtendimentoPendente {
 }
 
 const SELECT_COLUNAS =
-  "id, colaborador_id, data_referencia, horario_registrado, latitude, longitude, endereco_completo, status_aprovacao, colaboradores(nome, matricula), registros_presenca!registro_presenca_entrada_id(horario_registrado)";
+  "id, colaborador_id, data_referencia, horario_registrado, latitude, longitude, endereco_completo, foto_path, status_aprovacao, colaboradores(nome, matricula), registros_presenca!registro_presenca_entrada_id(horario_registrado)";
 
 interface AtendimentoRowBruta
   extends Omit<AtendimentoPendente, "colaborador_nome" | "colaborador_matricula" | "entrada_horario_registrado"> {

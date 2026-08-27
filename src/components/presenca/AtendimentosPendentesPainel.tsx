@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { VerFotoBotao } from "@/components/presenca/VerFotoBotao";
+import { MapaModal } from "@/components/presenca/MapaModal";
 import * as atendimentoService from "@/services/atendimentoService";
 import type { AtendimentoPendente } from "@/services/atendimentoService";
 
@@ -26,6 +28,7 @@ export function AtendimentosPendentesPainel({ somenteLeitura }: AtendimentosPend
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [itemNoMapa, setItemNoMapa] = useState<AtendimentoPendente | null>(null);
 
   async function carregar() {
     try {
@@ -86,33 +89,53 @@ export function AtendimentosPendentesPainel({ somenteLeitura }: AtendimentosPend
                   Saída {formatarHora(item.horario_registrado)}
                 </p>
                 {item.endereco_completo && (
-                  <p className="text-xs text-ink/50 dark:text-white/50">{item.endereco_completo}</p>
+                  <button
+                    type="button"
+                    onClick={() => setItemNoMapa(item)}
+                    className="text-left text-xs text-primary underline decoration-dotted hover:no-underline"
+                  >
+                    {item.endereco_completo}
+                  </button>
                 )}
               </div>
-              {!somenteLeitura && (
-                <div className="flex gap-2 sm:shrink-0">
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    disabled={processando === item.id}
-                    onClick={() => decidir(item.id, false)}
-                  >
-                    Rejeitar
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="md"
-                    loading={processando === item.id}
-                    onClick={() => decidir(item.id, true)}
-                  >
-                    Aprovar
-                  </Button>
-                </div>
-              )}
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                {item.foto_path && (
+                  <VerFotoBotao fotoPath={item.foto_path} nome={item.colaborador_nome ?? "Colaborador"} />
+                )}
+                {!somenteLeitura && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      disabled={processando === item.id}
+                      onClick={() => decidir(item.id, false)}
+                    >
+                      Rejeitar
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      loading={processando === item.id}
+                      onClick={() => decidir(item.id, true)}
+                    >
+                      Aprovar
+                    </Button>
+                  </>
+                )}
+              </div>
             </li>
           ))}
         </ul>
       </CardBody>
+      {itemNoMapa && (
+        <MapaModal
+          latitude={itemNoMapa.latitude}
+          longitude={itemNoMapa.longitude}
+          titulo={itemNoMapa.colaborador_nome ?? "Colaborador"}
+          endereco={itemNoMapa.endereco_completo}
+          onFechar={() => setItemNoMapa(null)}
+        />
+      )}
     </Card>
   );
 }

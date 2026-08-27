@@ -1,45 +1,9 @@
 import { useMemo, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
-import { obterUrlFoto } from "@/services/presencaService";
+import { VerFotoBotao } from "@/components/presenca/VerFotoBotao";
 import { apos9hEmDiaUtil } from "@/lib/calendario";
 import { ALTURA_LISTA_CARDS } from "@/lib/uiConstantes";
 import { STATUS_DIA_LABEL, type StatusDiaRegistro } from "@/types/status";
-
-/** Botão que revela a foto do check-in — visível a qualquer login (inclusive somente leitura), já que é uma ação de consulta, não de escrita. */
-function VerFoto({ fotoPath, nome }: { fotoPath: string; nome: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [carregando, setCarregando] = useState(false);
-
-  async function abrir() {
-    setCarregando(true);
-    const link = await obterUrlFoto(fotoPath);
-    setUrl(link);
-    setCarregando(false);
-  }
-
-  if (url) {
-    return (
-      <a href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-        <img
-          src={url}
-          alt={`Foto do check-in de ${nome}`}
-          className="h-9 w-9 rounded-md border border-ink/15 object-cover dark:border-white/15"
-        />
-      </a>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={abrir}
-      disabled={carregando}
-      className="rounded-full border border-ink/15 px-2.5 py-1 text-xs font-semibold text-ink/60 hover:bg-surface dark:border-white/15 dark:text-white/60 dark:hover:bg-white/5"
-    >
-      {carregando ? "Carregando..." : "📷 Ver foto"}
-    </button>
-  );
-}
 
 type Filtro =
   | "todos"
@@ -215,7 +179,7 @@ export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, o
                     <span className={["rounded-full px-2.5 py-1 text-xs font-semibold", corBadge].join(" ")}>
                       {STATUS_DIA_LABEL[item.status]}
                     </span>
-                    {item.foto_path && <VerFoto fotoPath={item.foto_path} nome={item.colaborador_nome ?? "Colaborador"} />}
+                    {item.foto_path && <VerFotoBotao fotoPath={item.foto_path} nome={item.colaborador_nome ?? "Colaborador"} />}
                     {renderAcoes?.(item)}
                   </div>
                 </li>
