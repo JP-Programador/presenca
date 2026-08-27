@@ -165,6 +165,10 @@ export function LiderDashboard() {
       />
 
       <main className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
+        <div className="mb-5">
+          <PendenteLancarCard itens={statusDoDia} />
+        </div>
+
         <AlertasCard />
 
         {ehLiderDireto && (
@@ -218,10 +222,6 @@ export function LiderDashboard() {
             />
           </div>
         )}
-
-        <div className="mb-5">
-          <PendenteLancarCard itens={statusDoDia} />
-        </div>
 
         <div className="mb-5 grid grid-cols-2 gap-2 rounded-md bg-white p-1 shadow-sm dark:bg-[#242424] sm:flex">
           <button

@@ -258,12 +258,12 @@ export function CoordenadorDashboard() {
           </div>
         )}
 
-        <AlertasCard />
-        <AtendimentosPendentesPainel />
-
         <div className="mb-6">
           <PendenteLancarCard itens={statusDoDia} />
         </div>
+
+        <AlertasCard />
+        <AtendimentosPendentesPainel />
 
         <Card className="mb-6">
           <CardHeader className="flex flex-wrap items-center justify-between gap-2">
