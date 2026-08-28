@@ -1,8 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import * as alertasService from "@/services/alertasService";
-import type { Alerta } from "@/services/alertasService";
+import type { Alerta, TipoAlerta } from "@/services/alertasService";
+
+// Mais crítico primeiro — "sem fechamento" (12h+, urgente) na frente de
+// avisos mais leves. Dentro do mesmo tipo, mais recente primeiro.
+const PRIORIDADE_TIPO: Record<TipoAlerta, number> = {
+  atendimento_sem_fechamento: 0,
+  checkin_proximo_residencia: 1,
+  ferias_sobrescreveu_registro: 2,
+  atendimento_pendente_fechamento: 3,
+};
 
 function formatarData(iso?: string) {
   if (!iso) return "?";
@@ -60,6 +69,16 @@ export function AlertasCard() {
     }
   }
 
+  const alertasOrdenados = useMemo(
+    () =>
+      [...alertas].sort((a, b) => {
+        const prioridade = PRIORIDADE_TIPO[a.tipo] - PRIORIDADE_TIPO[b.tipo];
+        if (prioridade !== 0) return prioridade;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }),
+    [alertas]
+  );
+
   if (carregando || alertas.length === 0) return null;
 
   return (
@@ -67,12 +86,13 @@ export function AlertasCard() {
       <CardHeader>
         <h2 className="text-sm font-semibold text-ink dark:text-white">Alertas</h2>
         <p className="text-xs text-ink/50 dark:text-white/50">
-          Avisos que precisam da sua atenção — férias sobrescritas, check-ins fora do padrão etc.
+          Avisos que precisam da sua atenção — férias sobrescritas, check-ins fora do padrão etc. Os mais
+          importantes aparecem primeiro.
         </p>
       </CardHeader>
       <CardBody>
-        <ul className="flex flex-col gap-3">
-          {alertas.map((a) => (
+        <ul className="flex max-h-[480px] flex-col gap-3 overflow-y-auto">
+          {alertasOrdenados.map((a) => (
             <li
               key={a.id}
               className={[
