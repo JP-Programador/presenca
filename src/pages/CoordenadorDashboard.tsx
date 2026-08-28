@@ -9,6 +9,7 @@ import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { AlertasCard } from "@/components/presenca/AlertasCard";
 import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
+import { ModalHabilitarNotificacoes } from "@/components/presenca/ModalHabilitarNotificacoes";
 import { TabelaMarcacoes } from "@/components/presenca/TabelaMarcacoes";
 import { TabelaCheckinsPertoCasa } from "@/components/presenca/TabelaCheckinsPertoCasa";
 import { AcoesPopupMapa } from "@/components/presenca/AcoesPopupMapa";
@@ -177,6 +178,7 @@ export function CoordenadorDashboard() {
 
   return (
     <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
+      <ModalHabilitarNotificacoes />
       <BrandHeader
         title="Painel de coordenação"
         subtitle="Visão consolidada de todas as filiais"

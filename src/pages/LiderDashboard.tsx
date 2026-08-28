@@ -8,6 +8,7 @@ import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { AlertasCard } from "@/components/presenca/AlertasCard";
 import { AtendimentoConfigToggle } from "@/components/presenca/AtendimentoConfigToggle";
 import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
+import { ModalHabilitarNotificacoes } from "@/components/presenca/ModalHabilitarNotificacoes";
 import { TabelaMarcacoes } from "@/components/presenca/TabelaMarcacoes";
 import { TabelaCheckinsPertoCasa } from "@/components/presenca/TabelaCheckinsPertoCasa";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
@@ -158,6 +159,7 @@ export function LiderDashboard() {
 
   return (
     <div className="min-h-screen bg-surface dark:bg-[#1A1A1A]">
+      <ModalHabilitarNotificacoes />
       <BrandHeader
         title={`Olá, ${usuario?.nome.split(" ")[0]}`}
         subtitle="Aprovações pendentes da sua filial"
