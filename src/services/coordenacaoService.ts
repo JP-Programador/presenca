@@ -156,6 +156,12 @@ export async function atualizarModoAtendimento(exigeSaida: boolean) {
   if (error) throw error;
 }
 
+/** Líder liga/desliga a exibição do mapa/check-ins perto de casa no próprio painel (só marca manual, sem GPS). */
+export async function atualizarDispensaMapa(dispensa: boolean) {
+  const { error } = await supabase.rpc("atualizar_meu_dispensa_mapa", { p_dispensa: dispensa });
+  if (error) throw error;
+}
+
 export interface NovoUsuarioInput {
   nome: string;
   email: string;

@@ -7,6 +7,7 @@ import { PendenteLancarCard } from "@/components/presenca/PendenteLancarCard";
 import { StatusActionMenu } from "@/components/presenca/StatusActionMenu";
 import { AlertasCard } from "@/components/presenca/AlertasCard";
 import { AtendimentoConfigToggle } from "@/components/presenca/AtendimentoConfigToggle";
+import { MapaConfigToggle } from "@/components/presenca/MapaConfigToggle";
 import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
 import { ModalHabilitarNotificacoes } from "@/components/presenca/ModalHabilitarNotificacoes";
 import { TabelaMarcacoes } from "@/components/presenca/TabelaMarcacoes";
@@ -38,6 +39,7 @@ export function LiderDashboard() {
   const [erro, setErro] = useState<string | null>(null);
   const [buscaNome, setBuscaNome] = useState("");
   const [exigeSaidaAtendimento, setExigeSaidaAtendimento] = useState(usuario?.exige_saida_atendimento ?? false);
+  const [dispensaMapa, setDispensaMapa] = useState(usuario?.dispensa_mapa ?? false);
   const [pontoFoco, setPontoFoco] = useState<{ latitude: number; longitude: number; label?: string } | null>(null);
   const [indicadores, setIndicadores] = useState<IndicadoresJornada | null>(null);
   const [dataPendencias, setDataPendencias] = useState(hojeISO());
@@ -176,6 +178,7 @@ export function LiderDashboard() {
         {ehLiderDireto && (
           <AtendimentoConfigToggle exigeSaidaAtual={exigeSaidaAtendimento} onAtualizado={setExigeSaidaAtendimento} />
         )}
+        {ehLiderDireto && <MapaConfigToggle dispensaMapaAtual={dispensaMapa} onAtualizado={setDispensaMapa} />}
 
         <AtendimentosPendentesPainel />
         {ehLiderDireto && exigeSaidaAtendimento && <TabelaMarcacoes />}
@@ -283,7 +286,7 @@ export function LiderDashboard() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {aba === "status_dia" && (
+            {aba === "status_dia" && !dispensaMapa && (
               <div className="mb-4 flex flex-col gap-4">
                 <Card>
                   <CardHeader className="flex flex-wrap items-center justify-between gap-2">
@@ -400,7 +403,7 @@ export function LiderDashboard() {
               />
             )}
 
-            {aba === "status_dia" && (
+            {aba === "status_dia" && !dispensaMapa && (
               <div className="mt-4">
                 <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
               </div>
@@ -408,20 +411,22 @@ export function LiderDashboard() {
 
             {aba === "geral" && (
               <>
-                <Card className="mb-4">
-                  <CardHeader>
-                    <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa da equipe</h2>
-                  </CardHeader>
-                  <CardBody>
-                    {carregandoMapaGeral ? (
-                      <div className="flex h-[320px] items-center justify-center rounded-lg border border-ink/10 bg-surface">
-                        <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      </div>
-                    ) : (
-                      <PresenceMap pontos={pontosMapaGeral} altura={320} />
-                    )}
-                  </CardBody>
-                </Card>
+                {!dispensaMapa && (
+                  <Card className="mb-4">
+                    <CardHeader>
+                      <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa da equipe</h2>
+                    </CardHeader>
+                    <CardBody>
+                      {carregandoMapaGeral ? (
+                        <div className="flex h-[320px] items-center justify-center rounded-lg border border-ink/10 bg-surface">
+                          <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        </div>
+                      ) : (
+                        <PresenceMap pontos={pontosMapaGeral} altura={320} />
+                      )}
+                    </CardBody>
+                  </Card>
+                )}
                 <TabelaGeralStatus data={dataGeral} onDataChange={setDataGeral} />
               </>
             )}

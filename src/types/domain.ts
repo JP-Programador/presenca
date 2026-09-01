@@ -130,4 +130,6 @@ export interface PerfilUsuario {
   senha_temporaria?: boolean;
   /** Só relevante quando perfil = 'gestor': exige também a saída de atendimento da equipe, não só a chegada. */
   exige_saida_atendimento?: boolean;
+  /** Só relevante quando perfil = 'gestor': true = líder marca presença sempre manual, esconde mapa/check-ins perto de casa no painel dele. */
+  dispensa_mapa?: boolean;
 }
