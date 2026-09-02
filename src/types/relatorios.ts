@@ -58,3 +58,18 @@ export interface LinhaRelatorioAtendimento {
   status: "aberto" | "pendente_aprovacao_saida" | "fechado" | "saida_rejeitada";
   alertas_gerados: number;
 }
+
+/** Colaborador com mais de N dias de FALTA num período — só auditoria/admin (RPC já restringe). */
+export interface FaltaRecorrente {
+  colaborador_id: string;
+  colaborador_nome: string;
+  colaborador_matricula: string;
+  filial_nome: string;
+  lider_id: string | null;
+  lider_nome: string | null;
+  coordenador_id: string | null;
+  coordenador_nome: string | null;
+  total_faltas: number;
+  primeira_falta: string;
+  ultima_falta: string;
+}

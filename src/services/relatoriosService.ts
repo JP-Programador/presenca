@@ -1,6 +1,20 @@
 import { supabase } from "@/services/supabaseClient";
-import type { LinhaRelatorioAtendimento, LinhaRelatorioPresenca } from "@/types/relatorios";
+import type { FaltaRecorrente, LinhaRelatorioAtendimento, LinhaRelatorioPresenca } from "@/types/relatorios";
 import type { AuditLogEntry } from "@/types/domain";
+
+/**
+ * Colaboradores com mais de `minimo` dias de FALTA nos últimos `dias` dias,
+ * com dados de líder e coordenador — só auditoria/admin (a RPC barra
+ * qualquer outro papel do lado do banco, isso aqui não é a única defesa).
+ */
+export async function listarFaltasRecorrentes(dias = 30, minimo = 3): Promise<FaltaRecorrente[]> {
+  const { data, error } = await supabase.rpc("colaboradores_faltas_recorrentes", {
+    p_dias: dias,
+    p_minimo: minimo,
+  });
+  if (error) throw error;
+  return (data ?? []) as FaltaRecorrente[];
+}
 
 export interface FiltroRelatorio {
   inicio: string; // data_referencia >=
