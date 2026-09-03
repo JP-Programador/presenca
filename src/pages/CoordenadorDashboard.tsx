@@ -18,6 +18,7 @@ import { RankingSlaStatusDia } from "@/components/presenca/RankingSlaStatusDia";
 import { RelatoriosExport } from "@/components/presenca/RelatoriosExport";
 import { TabelaGeralStatus } from "@/components/presenca/TabelaGeralStatus";
 import { SeletorPeriodoMapa, type ModoMapa } from "@/components/presenca/SeletorPeriodoMapa";
+import { SecaoColapsavel } from "@/components/ui/SecaoColapsavel";
 import { useAuth } from "@/providers/AuthProvider";
 import { hojeISO, mesAtualISO, intervaloDoMes } from "@/lib/calendario";
 import { listarRankingLideres } from "@/services/coordenacaoService";
@@ -315,64 +316,73 @@ export function CoordenadorDashboard() {
           </Card>
         )}
 
-        <AlertasCard />
-        <AtendimentosPendentesPainel />
+        <SecaoColapsavel titulo="Alertas">
+          <AlertasCard />
+        </SecaoColapsavel>
 
-        <Card className="mb-6">
-          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa operacional</h2>
-              <p className="text-xs text-ink/50 dark:text-white/50">
-                Clique numa marcação pendente pra aprovar ou rejeitar direto por aqui. A busca por nome é a mesma
-                do painel de pendências, mais abaixo.
-              </p>
-            </div>
-            <SeletorPeriodoMapa
-              modo={modoMapa}
-              onModoChange={setModoMapa}
-              data={dataMapa}
-              onDataChange={setDataMapa}
-              mes={mesMapa}
-              onMesChange={setMesMapa}
-            />
-          </CardHeader>
-          <CardBody>
-            {carregandoMapa ? (
-              <MapaCarregando />
-            ) : (
-              <PresenceMap
-                pontos={pontosMapa}
-                filtroNomeExterno={buscaNome}
-                pontoFoco={pontoFoco}
-                renderAcoesPopup={
-                  ehAuditor
-                    ? undefined
-                    : (ponto) => {
-                        const row = statusDoDia.find((s) => s.id === ponto.status_dia_id);
-                        if (!row) return null;
-                        return (
-                          <AcoesPopupMapa
-                            row={row}
-                            onAprovar={() =>
-                              aplicarEventoStatusDia(row, () =>
-                                statusDiaService.aplicarEvento(row, { tipo: "APROVAR" })
-                              )
-                            }
-                            onRejeitar={() =>
-                              aplicarEventoStatusDia(row, () =>
-                                statusDiaService.aplicarEvento(row, { tipo: "REJEITAR" })
-                              )
-                            }
-                          />
-                        );
-                      }
-                }
+        <SecaoColapsavel titulo="Saídas de atendimento pendentes">
+          <AtendimentosPendentesPainel />
+        </SecaoColapsavel>
+
+        <SecaoColapsavel titulo="Mapa operacional">
+          <Card className="mb-6">
+            <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold text-ink dark:text-white">Mapa operacional</h2>
+                <p className="text-xs text-ink/50 dark:text-white/50">
+                  Clique numa marcação pendente pra aprovar ou rejeitar direto por aqui. A busca por nome é a mesma
+                  do painel de pendências, mais abaixo.
+                </p>
+              </div>
+              <SeletorPeriodoMapa
+                modo={modoMapa}
+                onModoChange={setModoMapa}
+                data={dataMapa}
+                onDataChange={setDataMapa}
+                mes={mesMapa}
+                onMesChange={setMesMapa}
               />
-            )}
-          </CardBody>
-        </Card>
+            </CardHeader>
+            <CardBody>
+              {carregandoMapa ? (
+                <MapaCarregando />
+              ) : (
+                <PresenceMap
+                  pontos={pontosMapa}
+                  filtroNomeExterno={buscaNome}
+                  pontoFoco={pontoFoco}
+                  renderAcoesPopup={
+                    ehAuditor
+                      ? undefined
+                      : (ponto) => {
+                          const row = statusDoDia.find((s) => s.id === ponto.status_dia_id);
+                          if (!row) return null;
+                          return (
+                            <AcoesPopupMapa
+                              row={row}
+                              onAprovar={() =>
+                                aplicarEventoStatusDia(row, () =>
+                                  statusDiaService.aplicarEvento(row, { tipo: "APROVAR" })
+                                )
+                              }
+                              onRejeitar={() =>
+                                aplicarEventoStatusDia(row, () =>
+                                  statusDiaService.aplicarEvento(row, { tipo: "REJEITAR" })
+                                )
+                              }
+                            />
+                          );
+                        }
+                  }
+                />
+              )}
+            </CardBody>
+          </Card>
+        </SecaoColapsavel>
 
-        <TabelaMarcacoes />
+        <SecaoColapsavel titulo="Relatório de marcações">
+          <TabelaMarcacoes />
+        </SecaoColapsavel>
 
         <Card className="mb-6">
           <CardHeader>
@@ -476,48 +486,52 @@ export function CoordenadorDashboard() {
           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-semibold text-ink dark:text-white">SLA de aprovação — status do dia</h2>
-            <p className="text-xs text-ink/50 dark:text-white/50">
-              Tempo entre o envio da presença (PENDENTE) e a decisão do líder. Verde ≤15min, amarelo 15-30min,
-              vermelho &gt;30min.
-            </p>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-5">
-            {carregandoDados ? (
-              <div className="flex justify-center py-8">
-                <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : (
-              <>
-                <RankingSlaStatusDia
-                  ranking={rankingSla}
-                  mediaGeralMin={mediaGeralMin}
-                  mediaMesAtualMin={mediaMesAtualMin}
-                />
-                {mediasDiariasRecentes.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-semibold text-ink/60 dark:text-white/60">Últimos dias</p>
-                    <div className="flex flex-wrap gap-2">
-                      {mediasDiariasRecentes.map((m) => (
-                        <div key={m.data} className="rounded-md border border-ink/10 px-3 py-1.5 text-xs">
-                          <span className="text-ink/50 dark:text-white/50">
-                            {new Date(m.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                          </span>{" "}
-                          <span className="font-semibold text-ink dark:text-white">{m.media_min} min</span>{" "}
-                          <span className="text-ink/40 dark:text-white/40">({m.total})</span>
-                        </div>
-                      ))}
+        <SecaoColapsavel titulo="SLA de aprovação — status do dia">
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-semibold text-ink dark:text-white">SLA de aprovação — status do dia</h2>
+              <p className="text-xs text-ink/50 dark:text-white/50">
+                Tempo entre o envio da presença (PENDENTE) e a decisão do líder. Verde ≤15min, amarelo 15-30min,
+                vermelho &gt;30min.
+              </p>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-5">
+              {carregandoDados ? (
+                <div className="flex justify-center py-8">
+                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : (
+                <>
+                  <RankingSlaStatusDia
+                    ranking={rankingSla}
+                    mediaGeralMin={mediaGeralMin}
+                    mediaMesAtualMin={mediaMesAtualMin}
+                  />
+                  {mediasDiariasRecentes.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-ink/60 dark:text-white/60">Últimos dias</p>
+                      <div className="flex flex-wrap gap-2">
+                        {mediasDiariasRecentes.map((m) => (
+                          <div key={m.data} className="rounded-md border border-ink/10 px-3 py-1.5 text-xs">
+                            <span className="text-ink/50 dark:text-white/50">
+                              {new Date(m.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                            </span>{" "}
+                            <span className="font-semibold text-ink dark:text-white">{m.media_min} min</span>{" "}
+                            <span className="text-ink/40 dark:text-white/40">({m.total})</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </>
-            )}
-          </CardBody>
-        </Card>
+                  )}
+                </>
+              )}
+            </CardBody>
+          </Card>
+        </SecaoColapsavel>
 
-        <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
+        <SecaoColapsavel titulo="Marcações perto de casa">
+          <TabelaCheckinsPertoCasa onSelecionar={setPontoFoco} />
+        </SecaoColapsavel>
       </main>
     </div>
   );
