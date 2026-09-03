@@ -7,12 +7,13 @@ export interface CheckinInput {
   latitude: number;
   longitude: number;
   precisao?: number;
+  /** Só relevante quando o líder exige saída de atendimento — o técnico escolhe na tela. Omitido = servidor decide sozinho (times que não exigem saída, ou compatibilidade). */
+  tipo?: "entrada" | "saida";
 }
 
 export interface CheckinResultado {
   ok: true;
   colaborador_nome: string;
-  /** O servidor decide sozinho — nunca é escolhido pelo técnico. */
   tipo: "entrada" | "saida";
   status?: "presente" | "atrasado"; // só presente quando tipo === "entrada"
   horario_registrado: string;
@@ -44,9 +45,10 @@ export async function validarColaborador(codigoFilial: string, matricula4: strin
 
 /**
  * Chama a Edge Function `checkin-publico`, usada pela tela do técnico (sem
- * login) — porta de entrada única pra presença e atendimento. Nunca manda
- * um "tipo": o servidor decide sozinho, olhando o banco, se é entrada ou
- * saída, e devolve isso na resposta.
+ * login) — porta de entrada única pra presença e atendimento. Quando o
+ * líder exige saída de atendimento, o técnico escolhe entrada/saída na
+ * tela e isso vai em `tipo`; o servidor ainda valida que a escolha faz
+ * sentido (saída exige uma entrada em aberto).
  */
 export async function enviarCheckin(input: CheckinInput): Promise<CheckinResultado | CheckinErro> {
   const { data, error } = await supabase.functions.invoke("checkin-publico", {
@@ -57,6 +59,7 @@ export async function enviarCheckin(input: CheckinInput): Promise<CheckinResulta
       latitude: input.latitude,
       longitude: input.longitude,
       precisao: input.precisao,
+      tipo: input.tipo,
     },
   });
 

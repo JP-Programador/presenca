@@ -7,13 +7,20 @@
 // (base64) e coordenadas GPS — todos obrigatórios — valida o colaborador,
 // sobe a foto para o Storage e grava o registro usando a service_role key.
 //
-// Único link público pro técnico: o SERVIDOR decide sozinho, olhando o
-// banco (`proximo_tipo_marcacao`/`entrada_atendimento_aberta`), se essa
-// marcação é uma ENTRADA de presença normal ou a SAÍDA de um atendimento em
-// aberto — o front nunca escolhe, e o "tipo" enviado pelo cliente (se algum
-// dia vier) é ignorado por segurança. Time cujo líder não exige saída de
+// Único link público pro técnico. Time cujo líder não exige saída de
 // atendimento (exige_saida_atendimento=false) sempre cai no fluxo de
-// entrada, exatamente como sempre foi — nada muda pra eles.
+// entrada, como sempre foi — nada muda pra eles, e qualquer "tipo" enviado
+// é ignorado nesse caso.
+//
+// Já para quem exige saída de atendimento: a decisão automática (olhar se
+// existe uma entrada em aberto) causava problema em cenários reais (ex.:
+// jornada que atravessa a virada do dia, ou o técnico esquecendo de bater a
+// saída de um atendimento anterior) — agora o TÉCNICO escolhe entrada ou
+// saída na hora, e o servidor só valida que a escolha faz sentido (saída
+// exige uma entrada em aberto pra vincular; sem isso, o servidor recusa
+// com uma mensagem clara em vez de adivinhar). Se o cliente não mandar
+// "tipo" nenhum (app antigo em cache), cai no comportamento automático de
+// antes, por segurança.
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { dentroDoLimite, extrairIp } from "../_shared/rateLimit.ts";
@@ -39,6 +46,8 @@ interface CheckinPayload {
   latitude: number;
   longitude: number;
   precisao?: number;
+  /** Só considerado quando o líder exige saída de atendimento — o técnico escolhe na tela. Ignorado (sempre "entrada") quando o líder não exige. */
+  tipo?: "entrada" | "saida";
 }
 
 interface RegistroPresenca {
@@ -72,7 +81,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "payload_invalido" }, 400);
   }
 
-  const { codigo_filial, matricula4, foto_base64, latitude, longitude, precisao } = payload;
+  const { codigo_filial, matricula4, foto_base64, latitude, longitude, precisao, tipo: tipoEscolhido } = payload;
 
   if (!codigo_filial || !matricula4 || matricula4.length !== 4 || !foto_base64 || latitude == null || longitude == null) {
     return json(
@@ -151,9 +160,8 @@ Deno.serve(async (req: Request) => {
 
   const colaborador = encontrados[0];
 
-  // 2.1. O servidor decide sozinho o tipo real da marcação — nunca confia
-  // em nada vindo do cliente. Time cujo líder não exige saída de
-  // atendimento sempre cai em "entrada" (comportamento de sempre).
+  // 2.1. Time cujo líder não exige saída de atendimento sempre cai em
+  // "entrada" (comportamento de sempre) — ignora qualquer "tipo" enviado.
   let exigeSaida = false;
   if (colaborador.lider_id) {
     const { data: lider } = await supabase
@@ -173,7 +181,32 @@ Deno.serve(async (req: Request) => {
     // resultado, o PostgREST devolve um objeto com todos os campos null, não
     // `null` puro. Só conta como "aberta" se realmente tiver um id.
     const candidata = entrada as RegistroPresenca | null;
-    entradaAberta = candidata?.id ? candidata : null;
+    const entradaAbertaReal = candidata?.id ? candidata : null;
+
+    if (tipoEscolhido === "entrada") {
+      // Técnico escolheu entrada explicitamente — segue o fluxo de entrada
+      // mesmo que exista uma entrada aberta (o próprio fluxo de entrada já
+      // bloqueia duplicata no mesmo dia via status_dia, mais abaixo).
+      entradaAberta = null;
+    } else if (tipoEscolhido === "saida") {
+      // Técnico escolheu saída explicitamente — só aceita se realmente
+      // existir uma entrada em aberto pra vincular; sem isso, recusa com
+      // mensagem clara em vez de adivinhar ou criar uma saída órfã.
+      if (!entradaAbertaReal) {
+        return json(
+          {
+            error: "sem_entrada_aberta",
+            mensagem: "Não encontramos uma entrada em aberto pra vincular essa saída. Confirme se você já bateu a entrada antes.",
+          },
+          409
+        );
+      }
+      entradaAberta = entradaAbertaReal;
+    } else {
+      // Sem "tipo" no payload (app antigo em cache) — comportamento
+      // automático de antes, por segurança.
+      entradaAberta = entradaAbertaReal;
+    }
   }
 
   // =========================================================

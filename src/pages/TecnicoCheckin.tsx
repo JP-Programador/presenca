@@ -14,9 +14,10 @@ type StatusValidacao = "vazio" | "verificando" | "encontrado" | "nao_encontrado"
 /**
  * Porta de entrada única do técnico — presença normal e, quando o líder
  * exigir, o fechamento do atendimento (saída) passam pelo MESMO link e pela
- * MESMA tela. O servidor decide sozinho (olhando o banco) se a marcação é
- * entrada ou saída — o técnico nunca escolhe, só confirma a matrícula e
- * segue a instrução na tela.
+ * MESMA tela. Quando o líder exige saída, o TÉCNICO escolhe entrada ou
+ * saída na hora (a decisão automática causava problema em cenários reais,
+ * ex.: jornada que atravessa a virada do dia) — o servidor ainda valida
+ * que a escolha faz sentido antes de gravar.
  */
 export function TecnicoCheckin() {
   const [codigoFilial, setCodigoFilial] = useState("");
@@ -95,6 +96,7 @@ export function TecnicoCheckin() {
         latitude: geo.coords.latitude,
         longitude: geo.coords.longitude,
         precisao: geo.coords.precisao,
+        tipo: exigeSaida ? proximaMarcacao : undefined,
       });
 
       if (!resposta.ok) {
@@ -210,6 +212,28 @@ export function TecnicoCheckin() {
               </CardBody>
             </Card>
 
+            {identificado && exigeSaida && (
+              <Card>
+                <CardBody className="flex flex-col gap-2">
+                  <p className="text-sm font-semibold text-ink dark:text-white">O que você está registrando?</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant={proximaMarcacao === "entrada" ? "primary" : "secondary"}
+                      onClick={() => setProximaMarcacao("entrada")}
+                    >
+                      Entrada
+                    </Button>
+                    <Button
+                      variant={proximaMarcacao === "saida" ? "primary" : "secondary"}
+                      onClick={() => setProximaMarcacao("saida")}
+                    >
+                      Saída
+                    </Button>
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+
             {identificado && (
               <>
                 <div className="flex gap-2">
@@ -277,7 +301,7 @@ export function TecnicoCheckin() {
                         {exigeSaida && (
                           <>
                             <br />
-                            Primeira marcação registra sua entrada. Segunda marcação registra sua saída.
+                            Confira acima se está marcando entrada ou saída antes de enviar.
                           </>
                         )}
                       </p>
