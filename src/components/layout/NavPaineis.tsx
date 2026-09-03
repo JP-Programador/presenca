@@ -31,6 +31,11 @@ export function NavPaineis({
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      {atual !== "lider" && perfil === "gestor" && (
+        <Link to="/lider" className="text-sm font-semibold text-primary hover:underline">
+          Presença
+        </Link>
+      )}
       {atual !== "coordenador" && temVisaoGlobal && (
         <Link to="/coordenador" className="text-sm font-semibold text-primary hover:underline">
           Coordenação

@@ -72,6 +72,8 @@ interface PendenciasPainelProps {
   /** Controla a busca por nome de fora (ex.: pra também filtrar o mapa acima). Omitir = busca só interna, como antes. */
   busca?: string;
   onBuscaChange?: (busca: string) => void;
+  /** Tira o teto de altura/scroll interno — usa quando não tem mais nada embaixo disputando espaço (ex.: líder que escondeu o mapa). */
+  semLimiteAltura?: boolean;
 }
 
 /**
@@ -81,7 +83,13 @@ interface PendenciasPainelProps {
  * cor quando o filtro correspondente está selecionado — do contrário fica
  * neutro, igual aos outros, para reduzir a poluição visual.
  */
-export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, onBuscaChange }: PendenciasPainelProps) {
+export function PendenciasPainel({
+  itens,
+  renderAcoes,
+  busca: buscaControlada,
+  onBuscaChange,
+  semLimiteAltura,
+}: PendenciasPainelProps) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [buscaInterna, setBuscaInterna] = useState("");
   const busca = buscaControlada ?? buscaInterna;
@@ -153,7 +161,7 @@ export function PendenciasPainel({ itens, renderAcoes, busca: buscaControlada, o
         </Card>
       ) : (
         <Card>
-          <ul className={`divide-y divide-ink/5 dark:divide-white/5 ${ALTURA_LISTA_CARDS}`}>
+          <ul className={`divide-y divide-ink/5 dark:divide-white/5 ${semLimiteAltura ? "" : ALTURA_LISTA_CARDS}`}>
             {filtrados.map((item) => {
               const destacado = destacarFaltas && item.status === "FALTA" && !item.decidido_por && filtro === "todos";
               const corBadge = filtro !== "todos" && pertenceAoFiltro(item, filtro) ? CORES_QUANDO_ATIVO[filtro] : NEUTRO;

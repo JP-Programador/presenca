@@ -160,6 +160,28 @@ export function CoordenadorDashboard() {
     return { presentes, pendentes, naoPlanejadas, planejadas, percentualDisponivel, slaMedio };
   }, [statusDoDia, ranking, escalados]);
 
+  // Quem ainda não lançou — mesma definição do filtro "Não lançaram" do
+  // painel de pendências (FALTA/FOLGA sem decisão humana ainda). Depois das
+  // 10h isso vira falta pra valer, então é a hora de cobrar antes disso.
+  const lideresPendentes = useMemo(() => {
+    const porLider = new Map<string, { total: number; pendentes: number }>();
+    for (const item of statusDoDia) {
+      const nome = item.lider_nome ?? "Sem líder";
+      const atual = porLider.get(nome) ?? { total: 0, pendentes: 0 };
+      atual.total++;
+      if ((item.status === "FALTA" || item.status === "FOLGA") && !item.decidido_por) atual.pendentes++;
+      porLider.set(nome, atual);
+    }
+    return Array.from(porLider.entries())
+      .map(([lider_nome, { total, pendentes }]) => ({
+        lider_nome,
+        pendentes,
+        percentual: total > 0 ? Math.round((pendentes / total) * 100) : 0,
+      }))
+      .filter((l) => l.pendentes > 0)
+      .sort((a, b) => b.pendentes - a.pendentes);
+  }, [statusDoDia]);
+
   const rankingSla = useMemo(() => ranquearPorLider(decisoesSla), [decisoesSla]);
   const mediaGeralMin = useMemo(() => {
     if (decisoesSla.length === 0) return null;
@@ -263,6 +285,35 @@ export function CoordenadorDashboard() {
         <div className="mb-6">
           <PendenteLancarCard itens={statusDoDia} />
         </div>
+
+        {lideresPendentes.length > 0 && (
+          <Card className="mb-6 border-[#8A6200]/30">
+            <CardHeader>
+              <h2 className="text-sm font-semibold text-ink dark:text-white">Líderes com pendência de lançamento</h2>
+              <p className="text-xs text-ink/50 dark:text-white/50">
+                Quem ainda não lançou a equipe até agora — depois das 10h, quem não lançar vira falta.
+              </p>
+            </CardHeader>
+            <CardBody>
+              <ul className="flex flex-col gap-2">
+                {lideresPendentes.map((l) => (
+                  <li
+                    key={l.lider_nome}
+                    className="flex items-center justify-between gap-2 rounded-md border border-ink/10 px-3 py-2 text-sm dark:border-white/10"
+                  >
+                    <span className="font-medium text-ink dark:text-white">{l.lider_nome}</span>
+                    <span className="flex items-center gap-2 text-xs text-ink/60 dark:text-white/60">
+                      {l.pendentes} pendente(s)
+                      <span className="rounded-full bg-[#FFF3DB] px-2 py-0.5 font-semibold text-[#8A6200]">
+                        {l.percentual}%
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+        )}
 
         <AlertasCard />
         <AtendimentosPendentesPainel />

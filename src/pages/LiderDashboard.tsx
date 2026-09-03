@@ -352,6 +352,7 @@ export function LiderDashboard() {
                 itens={statusDoDia}
                 busca={buscaNome}
                 onBuscaChange={setBuscaNome}
+                semLimiteAltura={dispensaMapa}
                 renderAcoes={
                   ehAuditor
                     ? undefined
