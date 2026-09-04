@@ -1,5 +1,5 @@
 import { supabase } from "@/services/supabaseClient";
-import type { FaltaRecorrente, LinhaRelatorioAtendimento, LinhaRelatorioPresenca } from "@/types/relatorios";
+import type { FaltaRecorrente, LinhaRelatorioAtendimento, LinhaRelatorioPresenca, LocalizacaoSuspeita } from "@/types/relatorios";
 import type { AuditLogEntry } from "@/types/domain";
 
 /**
@@ -14,6 +14,19 @@ export async function listarFaltasRecorrentes(dias = 30, minimo = 3): Promise<Fa
   });
   if (error) throw error;
   return (data ?? []) as FaltaRecorrente[];
+}
+
+/**
+ * Sinais indiretos de possível GPS fake (teleporte impossível entre
+ * marcações + precisão suspeita) nos últimos `dias` dias — só auditoria/admin
+ * (a RPC barra qualquer outro papel do lado do banco). Não é prova, é
+ * indício pra checar caso a caso — o navegador não expõe se a localização
+ * veio de um app de GPS falso.
+ */
+export async function listarLocalizacoesSuspeitas(dias = 30): Promise<LocalizacaoSuspeita[]> {
+  const { data, error } = await supabase.rpc("localizacoes_suspeitas", { p_dias: dias });
+  if (error) throw error;
+  return (data ?? []) as LocalizacaoSuspeita[];
 }
 
 export interface FiltroRelatorio {

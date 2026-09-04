@@ -59,6 +59,27 @@ export interface LinhaRelatorioAtendimento {
   alertas_gerados: number;
 }
 
+/**
+ * Sinal indireto de possível GPS fake numa marcação — não é prova, é indício
+ * pra auditoria checar caso a caso. "teleporte": distância entre duas
+ * marcações do mesmo colaborador implica velocidade impossível. "precisao_suspeita":
+ * precisão de GPS baixa demais pra ser real (<= 1m).
+ */
+export interface LocalizacaoSuspeita {
+  colaborador_id: string;
+  colaborador_nome: string;
+  colaborador_matricula: string;
+  lider_nome: string | null;
+  tipo_suspeita: "teleporte" | "precisao_suspeita";
+  horario_registrado: string;
+  latitude: number;
+  longitude: number;
+  precisao_metros: number | null;
+  horario_anterior: string | null;
+  distancia_km: number | null;
+  velocidade_kmh: number | null;
+}
+
 /** Colaborador com mais de N dias de FALTA num período — só auditoria/admin (RPC já restringe). */
 export interface FaltaRecorrente {
   colaborador_id: string;

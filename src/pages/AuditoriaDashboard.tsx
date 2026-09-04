@@ -7,6 +7,7 @@ import { ExportButtons } from "@/components/ui/ExportButtons";
 import { PendenciasPainel } from "@/components/presenca/PendenciasPainel";
 import { AtendimentosPendentesPainel } from "@/components/presenca/AtendimentosPendentesPainel";
 import { FaltasRecorrentesCard } from "@/components/presenca/FaltasRecorrentesCard";
+import { LocalizacoesSuspeitasCard } from "@/components/presenca/LocalizacoesSuspeitasCard";
 import { AuditFilters } from "@/components/presenca/AuditFilters";
 import { AuditTimeline } from "@/components/presenca/AuditTimeline";
 import { AuditDetailsModal } from "@/components/presenca/AuditDetailsModal";
@@ -139,7 +140,12 @@ export function AuditoriaDashboard() {
 
         <AtendimentosPendentesPainel somenteLeitura />
 
-        {(usuario.perfil === "auditor" || usuario.perfil === "admin") && <FaltasRecorrentesCard />}
+        {(usuario.perfil === "auditor" || usuario.perfil === "admin") && (
+          <>
+            <FaltasRecorrentesCard />
+            <LocalizacoesSuspeitasCard />
+          </>
+        )}
 
         <Card>
           <CardHeader className="flex flex-wrap items-center justify-between gap-3">
