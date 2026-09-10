@@ -408,7 +408,7 @@ export function CoordenadorDashboard() {
 
         <Card className="mb-6">
           <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-            <div>
+            <div className="min-w-0 flex-1">
               <h2 className="text-sm font-semibold text-ink dark:text-white">Pendências e cobrança</h2>
               <p className="text-xs text-ink/50 dark:text-white/50">
                 Status do dia de todos os colaboradores, todas as filiais. Escolha uma data anterior se precisar
@@ -420,7 +420,7 @@ export function CoordenadorDashboard() {
               value={dataPendencias}
               max={hojeISO()}
               onChange={(e) => setDataPendencias(e.target.value)}
-              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+              className="h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white sm:w-auto"
             />
           </CardHeader>
           <CardBody>

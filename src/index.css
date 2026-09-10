@@ -10,8 +10,24 @@
   color-scheme: dark;
 }
 
+html,
+body {
+  /* Rede de segurança pra telas estreitas (ex.: Realme C55 ~360px): nada
+     "estoura" a largura da página. `clip` não cria um scroll container, então
+     não quebra `position: sticky` dos cabeçalhos de tabela. */
+  overflow-x: clip;
+}
+
 body {
   @apply bg-surface text-ink antialiased transition-colors dark:bg-[#1A1A1A] dark:text-[#F0F0F0];
+}
+
+/* Campos de formulário nunca devem ultrapassar a largura do container no
+   mobile — sempre encolhem junto. */
+input,
+select,
+textarea {
+  max-width: 100%;
 }
 
 /* Foco visível consistente em elementos interativos sem estilo próprio de foco (Módulo 14 — acessibilidade) */

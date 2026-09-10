@@ -183,7 +183,7 @@ export function LiderDashboard() {
         <AtendimentosPendentesPainel />
         {ehLiderDireto && exigeSaidaAtendimento && <TabelaMarcacoes />}
 
-        <div className="mb-5 grid grid-cols-3 gap-2">
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <MetricCard
             label="Disponibilidade"
             valor={`${metricas.percentualPresenca}%`}
@@ -206,7 +206,7 @@ export function LiderDashboard() {
         </div>
 
         {indicadores && (
-          <div className="mb-5 grid grid-cols-3 gap-2">
+          <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <MetricCard
               label="Perto de casa"
               valor={String(indicadores.pertoDeCasaColaboradores)}
@@ -257,7 +257,7 @@ export function LiderDashboard() {
 
         {aba === "status_dia" && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-ink/50 dark:text-white/50">
+            <p className="min-w-0 flex-1 text-xs text-ink/50 dark:text-white/50">
               Pendências de aprovação de outro dia (ex.: alguém que não lançou ontem) também aparecem aqui.
             </p>
             <input
@@ -265,7 +265,7 @@ export function LiderDashboard() {
               value={dataPendencias}
               max={hojeISO()}
               onChange={(e) => setDataPendencias(e.target.value)}
-              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+              className="h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white sm:w-auto"
             />
           </div>
         )}

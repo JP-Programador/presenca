@@ -22,11 +22,11 @@ export function MetricCard({
 
   return (
     <div
-      className="rounded-lg border border-ink/10 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#242424]"
+      className="rounded-lg border border-ink/10 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-[#242424] sm:p-4"
       title={tooltip}
     >
-      <p className="truncate text-xs font-semibold uppercase tracking-wide text-ink/50 dark:text-white/50">{label}</p>
-      <p className={["mt-1 text-2xl font-bold", cor].join(" ")}>{valor}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink/50 dark:text-white/50">{label}</p>
+      <p className={["mt-1 text-xl font-bold sm:text-2xl", cor].join(" ")}>{valor}</p>
       {subtitulo && <p className="mt-0.5 truncate text-xs text-ink/50 dark:text-white/50">{subtitulo}</p>}
     </div>
   );

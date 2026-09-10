@@ -26,7 +26,7 @@ export function SeletorPeriodoMapa({
   onMesChange,
 }: SeletorPeriodoMapaProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
       <div className="flex gap-1 rounded-md border border-ink/15 bg-white p-1 dark:border-white/15 dark:bg-[#242424]">
         <button
           type="button"
@@ -56,7 +56,7 @@ export function SeletorPeriodoMapa({
           value={data}
           max={hojeISO()}
           onChange={(e) => onDataChange(e.target.value)}
-          className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+          className="h-10 flex-1 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white sm:flex-none"
         />
       ) : (
         <input
@@ -64,7 +64,7 @@ export function SeletorPeriodoMapa({
           value={mes}
           max={mesAtualISO()}
           onChange={(e) => onMesChange(e.target.value)}
-          className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white"
+          className="h-10 flex-1 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink dark:border-white/15 dark:bg-[#242424] dark:text-white sm:flex-none"
         />
       )}
     </div>

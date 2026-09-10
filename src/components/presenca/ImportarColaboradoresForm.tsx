@@ -192,7 +192,7 @@ export function ImportarColaboradoresForm({ liderFixo, lideres, filiais, onImpor
             const arquivo = e.target.files?.[0];
             if (arquivo) processarArquivo(arquivo);
           }}
-          className="text-sm text-ink dark:text-white"
+          className="w-full max-w-full text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-ink dark:text-white dark:file:bg-white/10 dark:file:text-white sm:w-auto"
         />
         {processando && (
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />

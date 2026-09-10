@@ -170,7 +170,7 @@ export function TecnicoCheckin() {
           <div className="flex flex-col gap-4">
             <Card>
               <CardBody className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2">
                   <Input
                     id="codigo-filial"
                     label="Código da filial"
