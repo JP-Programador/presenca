@@ -277,6 +277,26 @@ export async function atualizarColaborador(
   }
 }
 
+/**
+ * Move toda a equipe ativa de um líder pra outro de uma vez só — o cenário
+ * de "líder secundário" (férias, afastamento): a equipe fica emprestada pro
+ * outro líder até alguém trocar de volta manualmente por aqui mesmo (não
+ * existe prazo automático, foi decisão consciente manter simples). É um
+ * UPDATE em lote comum, a RLS (coordenador só move entre líderes que ele
+ * coordena) já garante quem pode fazer o quê; o trigger de auditoria em
+ * lider_id registra cada colaborador movido.
+ */
+export async function reatribuirEquipeLote(liderOrigemId: string, liderDestinoId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("colaboradores")
+    .update({ lider_id: liderDestinoId })
+    .eq("lider_id", liderOrigemId)
+    .eq("ativo", true)
+    .select("id");
+  if (error) throw error;
+  return data?.length ?? 0;
+}
+
 /** Cadastra/troca o CEP residencial de um colaborador já existente, geocodificando de novo. */
 export async function atualizarCepColaborador(id: string, cep: string): Promise<CoordenadaGeocodificada | null> {
   const coordenada = await geocodificarCep(cep);

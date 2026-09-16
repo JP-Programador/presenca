@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { NovoColaboradorForm } from "@/components/presenca/NovoColaboradorForm";
 import { ImportarColaboradoresForm } from "@/components/presenca/ImportarColaboradoresForm";
 import { TrocarLiderColaborador } from "@/components/presenca/TrocarLiderColaborador";
+import { ReatribuirEquipeLote } from "@/components/presenca/ReatribuirEquipeLote";
 import { EditarCepColaborador } from "@/components/presenca/EditarCepColaborador";
 import { ExcluirColaboradorButton } from "@/components/presenca/ExcluirColaboradorButton";
 import { useAuth } from "@/providers/AuthProvider";
@@ -123,6 +124,10 @@ export function ColaboradoresGestao() {
             <ImportarColaboradoresForm liderFixo={liderFixo} lideres={lideres} filiais={filiais} onImportado={carregar} />
           </CardBody>
         </Card>
+
+        {!ehLider && lideres.length > 1 && (
+          <ReatribuirEquipeLote colaboradores={colaboradores} lideres={lideres} onAtualizado={carregar} />
+        )}
 
         <Card>
           <CardHeader className="flex flex-wrap items-center justify-between gap-2">
