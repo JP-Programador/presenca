@@ -15,6 +15,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { listarFiliais, listarLideres } from "@/services/coordenacaoService";
 import type { PessoaSimples } from "@/services/coordenacaoService";
 import { listarColaboradores } from "@/services/colaboradoresService";
+import { cruzarComDemitidos, listarDemitidosDoAno } from "@/services/demitidosService";
 import { ALTURA_LISTA_CARDS } from "@/lib/uiConstantes";
 import type { Colaborador, Filial } from "@/types/domain";
 
@@ -31,6 +32,7 @@ export function ColaboradoresGestao() {
   const [buscaCargo, setBuscaCargo] = useState("");
   const [buscaLiderId, setBuscaLiderId] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [demissoes, setDemissoes] = useState<Map<string, string>>(new Map());
 
   async function carregar() {
     setCarregando(true);
@@ -43,6 +45,10 @@ export function ColaboradoresGestao() {
         listarFiliais(),
       ]);
       setColaboradores(cols);
+      // Lembrete é informativo: se a base de RH falhar, a tela segue sem ele.
+      listarDemitidosDoAno()
+        .then((dem) => setDemissoes(cruzarComDemitidos(cols, dem)))
+        .catch(() => setDemissoes(new Map()));
       setLideres(lids);
       setFiliais(fils);
     } catch {
@@ -193,6 +199,14 @@ export function ColaboradoresGestao() {
                         {!c.ativo && (
                           <span className="ml-2 rounded-full bg-[#FBE7E7] px-2 py-0.5 text-xs font-semibold text-danger">
                             Inativo
+                          </span>
+                        )}
+                        {c.ativo && demissoes.has(c.id) && (
+                          <span
+                            className="ml-2 rounded-full bg-[#FFF3D6] px-2 py-0.5 text-xs font-semibold text-[#8A5A00]"
+                            title="Consta como demitido na base do RH"
+                          >
+                            Possível demissão · {demissoes.get(c.id)!.split("-").reverse().join("/")}
                           </span>
                         )}
                       </p>
