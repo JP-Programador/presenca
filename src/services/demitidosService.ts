@@ -3,7 +3,7 @@ import type { Colaborador } from "@/types/domain";
 
 export interface DemissaoRh {
   matricula_norm: string;
-  nome: string;
+  primeiro_nome: string;
   data_demissao: string;
 }
 
@@ -20,7 +20,7 @@ export async function listarDemitidosDoAno(): Promise<DemissaoRh[]> {
   const ano = new Date().getFullYear();
   const { data, error } = await supabase
     .from("rh_demitidos")
-    .select("matricula_norm, nome, data_demissao")
+    .select("matricula_norm, primeiro_nome, data_demissao")
     .gte("data_demissao", `${ano}-01-01`)
     .lte("data_demissao", `${ano}-12-31`);
   if (error) throw error;
@@ -42,7 +42,7 @@ export function cruzarComDemitidos(colaboradores: Colaborador[], demitidos: Demi
     if (!c.ativo) continue;
     const achado = porMatricula
       .get(normalizarMatricula(c.matricula))
-      ?.find((d) => primeiroNome(d.nome) === primeiroNome(c.nome));
+      ?.find((d) => d.primeiro_nome === primeiroNome(c.nome));
     if (achado) resultado.set(c.id, achado.data_demissao);
   }
   return resultado;

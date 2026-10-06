@@ -32,14 +32,14 @@ for (const l of linhas) {
   const chave = `${mat}|${data}`;
   if (vistos.has(chave)) continue;
   vistos.add(chave);
-  const filial = String(l["FILIAL"] ?? "").trim();
-  valores.push(`('${esc(mat)}','${esc(nome)}','${data}','${esc(filial)}')`);
+  const primeiro = nome.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/)[0];
+  valores.push(`('${esc(mat)}','${esc(primeiro)}','${data}')`);
 }
 
 const sql =
   `-- Demitidos ${ano} (gerado em ${new Date().toISOString().slice(0, 10)}) — ${valores.length} linhas\n` +
   `delete from tlp_presenca.rh_demitidos;\n` +
-  `insert into tlp_presenca.rh_demitidos (matricula_norm, nome, data_demissao, filial_rh) values\n` +
+  `insert into tlp_presenca.rh_demitidos (matricula_norm, primeiro_nome, data_demissao) values\n` +
   valores.join(",\n") +
   `\non conflict do nothing;\n`;
 const saida = `supabase/seed/demitidos_${ano}.sql`;
