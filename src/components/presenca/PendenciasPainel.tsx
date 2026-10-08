@@ -182,6 +182,9 @@ export function PendenciasPainel({
                       {item.filial_nome}
                       {item.status === "OUTROS" && item.motivo_outros ? ` · ${item.motivo_outros}` : ""}
                     </p>
+                    {item.endereco_completo && (
+                      <p className="text-xs text-ink/60 dark:text-white/60">{item.endereco_completo}</p>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={["rounded-full px-2.5 py-1 text-xs font-semibold", corBadge].join(" ")}>
