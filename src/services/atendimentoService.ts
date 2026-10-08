@@ -82,3 +82,21 @@ export async function listarSaidasPeriodo(
   if (error) throw error;
   return (data ?? []) as SaidaAtendimentoMapa[];
 }
+
+/**
+ * Fallback de exibição para saídas gravadas sem endereço (a geocodificação
+ * do servidor falhou na hora). O browser usa o Nominatim com o próprio
+ * Referer, que não sofre o rate limit dos IPs compartilhados da Edge Function.
+ */
+export async function buscarEnderecoPorCoordenada(latitude: number, longitude: number): Promise<string | null> {
+  try {
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+    );
+    if (!resp.ok) return null;
+    const dados = await resp.json();
+    return dados?.display_name ?? null;
+  } catch {
+    return null;
+  }
+}

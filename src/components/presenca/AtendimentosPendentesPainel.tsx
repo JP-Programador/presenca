@@ -32,7 +32,16 @@ export function AtendimentosPendentesPainel({ somenteLeitura }: AtendimentosPend
 
   async function carregar() {
     try {
-      setItens(await atendimentoService.listarAtendimentosPendentes());
+      const lista = await atendimentoService.listarAtendimentosPendentes();
+      setItens(lista);
+      // Saídas gravadas sem endereço: completa só na exibição (1 req/s, política do Nominatim).
+      for (const item of lista.filter((i) => !i.endereco_completo)) {
+        const endereco = await atendimentoService.buscarEnderecoPorCoordenada(item.latitude, item.longitude);
+        if (endereco) {
+          setItens((prev) => prev.map((i) => (i.id === item.id ? { ...i, endereco_completo: endereco } : i)));
+        }
+        await new Promise((r) => setTimeout(r, 1100));
+      }
     } catch {
       // Painel informativo — falha silenciosa não deve travar o resto da tela.
     } finally {
