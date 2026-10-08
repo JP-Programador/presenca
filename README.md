@@ -1,8 +1,11 @@
 # TLP · Presença Operacional
 
-Estrutura base do projeto (React + Vite + TypeScript + Tailwind + Supabase).
-**Nenhuma tela foi implementada ainda** — este pacote entrega apenas
-fundação (config, tema, cliente Supabase) e o backend completo (SQL + Edge Function).
+Sistema de controle de presença operacional (React + Vite + TypeScript + Tailwind + Supabase).
+
+> Este README é organizado por etapas, na ordem em que o sistema foi construído.
+> As Etapas 1–5 descrevem a base; **a partir da Etapa 6 estão as evoluções recentes**.
+> Onde uma etapa antiga diverge de uma posterior (ex.: retenção de foto, escopo do
+> coordenador), vale a posterior — veja a seção *"O que mudou em relação às etapas 1–5"*.
 
 ## Árvore de pastas
 
@@ -72,7 +75,7 @@ e o objeto `theme` de `src/theme/theme.ts` em qualquer lógica JS/TS fora do JSX
 - **gestor_filiais** — N:N entre gestores e as filiais que gerenciam.
 - **colaboradores** — cadastro operacional, vinculado a uma filial (e opcionalmente a um `perfil` de login).
 - **escalas** — grade semanal de horário previsto por colaborador (usada para calcular atraso).
-- **registros_presenca** — cada marcação (entrada/intervalo/saída), com foto, geolocalização e `foto_expira_em` (48h).
+- **registros_presenca** — cada marcação (entrada/intervalo/saída), com foto, geolocalização e `foto_expira_em` (hoje 7 dias — ver Etapa 6).
 - **justificativas** — fluxo de aprovação de ausências/atrasos.
 - **audit_log** — trilha de auditoria (ex.: exclusão automática de fotos).
 
@@ -90,7 +93,7 @@ essa lógica e são reaproveitadas tanto nas policies das tabelas quanto nas do 
 - `tlp-fotos-presenca` (privado, 5MB, jpeg/png/webp) — path `{filial_id}/{colaborador_id}/{arquivo}`.
 - `justificativas` (privado, 10MB, jpeg/png/pdf) — mesma convenção de path.
 
-## Exclusão automática de fotos após 48h
+## Exclusão automática de fotos (48h na Etapa 1 → 7 dias hoje)
 
 1. Ao inserir/atualizar `foto_path` em `registros_presenca`, um trigger calcula
    `foto_expira_em = horario_registrado + 48h` (migration 0004).
@@ -391,6 +394,114 @@ promovê-los manualmente para `admin` depois de aplicar esta migration:
 update tlp_presenca.perfis set perfil = 'admin' where email = 'pessoa@tlp.com.br';
 ```
 
+## Etapa 6 — Evolução (migrations 0016 → 0075)
+
+### Papéis e escopo (atual)
+
+```
+admin        ─── tudo; único que mexe em filiais, calendário e audit_log completo
+gerente      ─── (0048/0049) vê e age em tudo abaixo de admin, cruzando coordenadores
+auditor      ─── leitura global + auditoria, sem nenhuma escrita
+coordenador  ─── (0035/0041) só vê/gerencia a PRÓPRIA hierarquia (líderes que criou e suas equipes)
+gestor       ─── "líder": equipe direta via colaboradores.lider_id (0028; gestor_filiais legado removido na 0038)
+colaborador  ─── só os próprios registros
+```
+
+Rotas e quem acessa (`src/routes/AppRoutes.tsx`):
+
+| Rota | Papéis |
+|---|---|
+| `/`, `/ponto` | público (check-in de presença **e** atendimento no mesmo link) |
+| `/ponto4` | público (4 marcações: entrada/intervalo/saída) |
+| `/admin` | login |
+| `/lider` | admin, gerente, auditor, coordenador, gestor |
+| `/coordenador` | admin, gerente, auditor, coordenador |
+| `/auditoria` | admin, auditor |
+| `/usuarios` | admin, gerente, coordenador |
+| `/colaboradores` | admin, gerente, coordenador, gestor |
+| `/dashboard-presenca` | admin, gerente, auditor, coordenador, gestor |
+
+Há também troca de senha obrigatória no primeiro acesso (`TrocarSenhaObrigatoria`,
+Edge Function `admin-redefinir-senha`).
+
+### Status do dia, calendário e marcação manual
+
+- `status_dia` (0018) é a fonte dos cards e tabelas: presente, falta, folga, outros etc.
+  O líder/coordenador pode mudar o status manualmente (com modal de confirmação).
+- Calendário de feriados/dias úteis (0017) define se o padrão do dia é FALTA ou FOLGA.
+- Motivos de "OUTROS" incluem Férias, Frota, Exame periódico, Bloqueado IHS e Base (0064),
+  com siglas na tabela resumo mensal.
+- **Férias em lote** (0045/0046): aplica o intervalo inteiro, mostra conflitos antes de
+  sobrescrever, cria alerta assíncrono para o coordenador e permite cancelar tudo-ou-nada.
+- Colaborador inativo não consegue agir (0047). Nomes de colaboradores e usuários são
+  sempre gravados em maiúsculo (0062).
+
+### Check-in público
+
+- Foto + GPS obrigatórios; foto do carro (0052); CEP de residência com geocodificação em
+  camadas (cascata de provedores, nunca falha o cadastro) e **alerta de check-in perto de casa**
+  com trilha do colaborador no mapa (0050/0051).
+- **Atendimento** (0053–0061): check-in/check-out de atendimento com foto, GPS e endereço
+  reverso, unificado ao mesmo link de presença. Saída de atendimento passa por aprovação do
+  líder; mudar o status manualmente cancela a saída pendente; alertas de 8h/12h se resolvem
+  sozinhos. O líder pode exigir que o técnico escolha entrada/saída manualmente.
+- Rate limit por IP nos endpoints públicos (0034) e grants de `anon` restritos (0033).
+- O aviso na tela de sucesso lembra que o check-in **não substitui o Ahgora**.
+- Fotos expiram em **7 dias** (0068; já foi 48h → 24h) via `delete-old-photos` + `pg_cron` (0043).
+
+### Painel do líder (`/lider`)
+
+Cards de métricas (presentes/faltas/ausentes/pendentes), card "Pendente lançar presença"
+(destaque após 9h), tabela Geral com visão mensal em grade (cartão-ponto) e filtros em cascata
+líder → colaborador, mapa operacional com seletor Dia/Mês e popup com aprovar/rejeitar,
+relatório de marcações/atendimentos exportável, auto-refresh de 1 min. O líder pode
+**dispensar o mapa** quando só marca presença manual (0069), **trocar o líder de um colaborador**
+(0073, auditado) e **emprestar a equipe inteira** a outro líder (férias/afastamento).
+
+### Painel do coordenador (`/coordenador`)
+
+Seções recolhíveis: Alertas (ordenados por prioridade), Saídas pendentes, Mapa operacional,
+Relatório de marcações, Marcações perto de casa, SLA por status do dia, líderes pendentes.
+
+### Auditoria (`/auditoria`, admin/auditor)
+
+Log avançado (0022) e cards exclusivos: **faltas recorrentes** (0070) e **localização suspeita /
+possível GPS fake** (0071), com heurística de "teleporte" ajustada para menos falso positivo (0072).
+
+### Dashboard de presença (`/dashboard-presenca`)
+
+Visão acumulada (semana/mês/30 dias), comparativo por filial, analytics e histórico mensal,
+gráfico de planta ativa e tabela detalhada exportável.
+
+### Notificações push (0065–0067)
+
+Web Push (`public/sw.js`, Edge Function `enviar-notificacoes-push`, cron 0066) com lembretes
+para líder, coordenador e admin; o modal de ativação reaparece a cada login até o usuário permitir.
+Exige as chaves VAPID configuradas nos secrets.
+
+### Colaboradores (`/colaboradores`)
+
+Cadastro/importação em lote, filtros e cópia em lote de matrícula, edição de CEP e ajuste de
+coordenada no mapa, reatribuição de equipe em lote, exclusão real (com confirmação). Lembrete
+de possível demissão cruza com a base RH do ano — tabela `rh_demitidos` guarda **somente**
+matrícula, primeiro nome e data de demissão (0074/0075, minimização de dados/LGPD).
+
+### Interface
+
+Tema claro/escuro (`ThemeToggle`), logo TLP e favicon, layout responsivo até ~360px.
+
+### O que mudou em relação às etapas 1–5
+
+| Tema | Etapas 1–5 | Hoje |
+|---|---|---|
+| Retenção de foto | 48h | 7 dias (0068) |
+| Coordenador | leitura global | só a própria hierarquia (0041) |
+| Gerenciar usuários | só admin | admin, gerente e coordenador (escopados) |
+| Vínculo líder × colaborador | `gestor_filiais` | `colaboradores.lider_id` (0028/0038) |
+| CPF | cadastrado | removido (0026) |
+| Ranking de líderes | tela dedicada | removido; SLA agora por status do dia (0021) |
+| Papéis | admin/auditor/coordenador/gestor/colaborador | + `gerente` |
+
 ## Como aplicar
 
 ```bash
@@ -404,6 +515,10 @@ supabase db push
 supabase functions deploy delete-old-photos
 supabase functions deploy checkin-publico
 supabase functions deploy admin-criar-usuario
+supabase functions deploy admin-redefinir-senha
+supabase functions deploy marcacao-publica
+supabase functions deploy validar-colaborador
+supabase functions deploy enviar-notificacoes-push
 
 # gerar os tipos TypeScript reais do banco
 supabase gen types typescript --project-id <PROJECT_ID> --schema public > src/types/database.types.ts
